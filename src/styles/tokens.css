@@ -1,0 +1,59 @@
+/* Gerado a partir das variáveis do Figma "MdA" (coleções Color e Dimension). */
+:root {
+  --bg-canvas: #f4f4f1;
+  --bg-surface: #ffffff;
+  --bg-muted: #ecece7;
+  --border: #e6e6e1;
+  --text-primary: #141414;
+  --text-secondary: #6b6b66;
+  --text-tertiary: #a3a39e;
+  --ink: #141414;
+  --on-ink: #ffffff;
+  --lime: #d4f25c;
+  --lime-soft: #eef9c4;
+  --on-lime: #141414;
+  --accent-on-ink: #d4f25c;
+  --danger: #a92e5a;
+
+  --trabalho-bg: #e6e0fb; --trabalho-fg: #5b45c9;
+  --estudos-bg: #dcebfa; --estudos-fg: #2262ad;
+  --saude-bg: #d8efe2; --saude-fg: #1f7046;
+  --relacoes-bg: #fadde7; --relacoes-fg: #a92e5a;
+  --financas-bg: #faefc8; --financas-fg: #7a5c0a;
+  --eu-bg: #fbe3d3; --eu-fg: #9c4614;
+  --neutro-bg: #ecece7; --neutro-fg: #6b6b66;
+
+  --s4: 4px; --s8: 8px; --s12: 12px; --s16: 16px; --s20: 20px; --s24: 24px; --s32: 32px; --s40: 40px;
+  --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-full: 999px;
+
+  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --shadow-float: 0 12px 40px rgba(20, 20, 20, 0.12), 0 2px 6px rgba(20, 20, 20, 0.06);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg-canvas: #0f0f0e; --bg-surface: #1a1a19; --bg-muted: #242422; --border: #2c2c2a;
+    --text-primary: #f4f4f1; --text-secondary: #a3a39e; --text-tertiary: #6b6b66;
+    --ink: #f4f4f1; --on-ink: #141414; --lime-soft: #2e3519; --accent-on-ink: #4a5a08; --danger: #f1a3be;
+    --trabalho-bg: #2a2540; --trabalho-fg: #b9aef5; --estudos-bg: #1e2c3b; --estudos-fg: #9cc6f2;
+    --saude-bg: #1d3227; --saude-fg: #93d7b0; --relacoes-bg: #3a2129; --relacoes-fg: #f1a3be;
+    --financas-bg: #3a3219; --financas-fg: #ebcb6e; --eu-bg: #3b2a1e; --eu-fg: #f2b48d;
+    --neutro-bg: #242422; --neutro-fg: #a3a39e;
+    --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --bg-canvas: #0f0f0e; --bg-surface: #1a1a19; --bg-muted: #242422; --border: #2c2c2a;
+  --text-primary: #f4f4f1; --text-secondary: #a3a39e; --text-tertiary: #6b6b66;
+  --ink: #f4f4f1; --on-ink: #141414; --lime-soft: #2e3519; --accent-on-ink: #4a5a08; --danger: #f1a3be;
+  --trabalho-bg: #2a2540; --trabalho-fg: #b9aef5; --estudos-bg: #1e2c3b; --estudos-fg: #9cc6f2;
+  --saude-bg: #1d3227; --saude-fg: #93d7b0; --relacoes-bg: #3a2129; --relacoes-fg: #f1a3be;
+  --financas-bg: #3a3219; --financas-fg: #ebcb6e; --eu-bg: #3b2a1e; --eu-fg: #f2b48d;
+  --neutro-bg: #242422; --neutro-fg: #a3a39e;
+  --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
