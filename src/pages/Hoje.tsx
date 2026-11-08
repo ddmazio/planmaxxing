@@ -10,6 +10,7 @@ import { Check, Empty, SectionHead } from '../components/ui'
 import { Icon } from '../components/Icon'
 import type { ShellCtx } from '../components/Shell'
 import { useWeekSteps } from './Ciclo'
+import { useCalendars } from '../lib/calendars'
 import { AreaTag } from '../components/ui'
 
 export function Hoje() {
@@ -25,9 +26,10 @@ export function Hoje() {
   const { rows: logs } = useRows<HabitLog>('habit_logs', { eq: { day: today } })
 
   const ws = useWeekSteps()
+  const cals = useCalendars(areas)
+  const visibleEvents = events.filter(cals.visible)
   const todays = tasks.filter(isToday).sort((a, b) => Number(b.important) - Number(a.important))
   const habitsToday = habits.filter((h) => h.days.includes(now.getDay()))
-  const areaOf = (id: string | null) => areas.find((a) => a.id === id)
 
   return (
     <div className="page wide">
@@ -46,14 +48,13 @@ export function Hoje() {
       <div className="grid2">
         <div className="stack">
           <SectionHead title="Agenda de hoje" action={<Link className="caption muted" to="/agenda">semana ›</Link>} />
-          {events.length ? (
+          {visibleEvents.length ? (
             <div className="card flush list">
-              {events.map((e) => {
-                const a = areaOf(e.area_id)
+              {visibleEvents.map((e) => {
                 return (
                   <Link key={e.id} to={`/agenda?evento=${e.id}`} className="list-row">
                     <span className="mono muted" style={{ width: 44 }}>{e.all_day ? 'dia' : hhmm(e.starts_at)}</span>
-                    <span style={{ width: 4, height: 20, borderRadius: 2, background: `var(--${a?.color ?? 'neutro'}-fg)` }} />
+                    <span style={{ width: 4, height: 20, borderRadius: 2, background: cals.paint(e).fg }} />
                     <span className="grow">{e.title}</span>
                   </Link>
                 )

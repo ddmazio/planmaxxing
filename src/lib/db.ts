@@ -108,9 +108,9 @@ export async function remove(table: TableName, id: string): Promise<void> {
 
 /** Exporta tudo o que é seu (para o botão "Exportar tudo"). */
 export async function exportAll(): Promise<Record<string, unknown[]>> {
-  const tables: TableName[] = ['profiles', 'areas', 'lists', 'tasks', 'task_items', 'events', 'habits', 'habit_logs', 'cycles', 'goals', 'steps', 'reflections', 'incomes', 'expenses', 'pots', 'subscriptions', 'budget_rules', 'groups', 'group_members', 'checkins']
+  const tables: TableName[] = ['profiles', 'areas', 'lists', 'tasks', 'task_items', 'events', 'habits', 'habit_logs', 'cycles', 'goals', 'steps', 'reflections', 'incomes', 'expenses', 'pots', 'subscriptions', 'budget_rules', 'groups', 'group_members', 'checkins', 'calendars']
   const out: Record<string, unknown[]> = {}
-  for (const t of tables) out[t] = await select(t)
+  for (const t of tables) { try { out[t] = await select(t) } catch { out[t] = [] } }
   return out
 }
 

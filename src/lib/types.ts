@@ -60,7 +60,7 @@ export interface ListMember { list_id: string; user_id: string }
 export type TableName =
   | 'profiles' | 'areas' | 'lists' | 'tasks' | 'task_items' | 'events' | 'habits' | 'habit_logs'
   | 'cycles' | 'goals' | 'steps' | 'reflections' | 'expenses' | 'incomes' | 'pots' | 'subscriptions' | 'budget_rules'
-  | 'groups' | 'group_members' | 'checkins' | 'list_members'
+  | 'groups' | 'group_members' | 'checkins' | 'list_members' | 'calendars'
 
 export interface Query {
   eq?: Record<string, string | number | boolean | null>
@@ -84,3 +84,5 @@ export interface Reflection extends Owned {
   cycle_id: string | null; kind: 'review' | 'checkin' | 'journal' | 'reset'; week: number | null
   prompt: string | null; answers: string[]; title: string | null; score: number | null
 }
+
+export interface Calendar extends Owned { external_id: string; name: string; color: string | null; visible: boolean; position: number }

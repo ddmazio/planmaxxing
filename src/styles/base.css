@@ -168,3 +168,17 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .blob { max-width: 120px; }
 @media (min-width: 1024px) { .mobile-only { display: none !important; } }
 @media (max-width: 1023px) { .desktop-only { display: none !important; } }
+
+/* agendas */
+.cal-item:hover { background: var(--bg-muted); }
+.cal-check { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--cal); flex: none; margin: 0; display: grid; place-items: center; cursor: pointer; }
+.cal-check:checked { background: var(--cal); }
+.cal-check:checked::after { content: ''; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.cal-event { border: 0; }
+.month-evs { display: none; }
+@media (min-width: 1024px) {
+  .month .day { min-height: 96px; }
+  .month-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .month-ev { font-size: 11px; line-height: 15px; padding: 0 4px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .month .dots { display: none; }
+}

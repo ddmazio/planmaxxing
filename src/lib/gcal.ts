@@ -1,6 +1,7 @@
 import { addDays, addMonths } from 'date-fns'
 import { ymd, toIso } from './dates'
-import type { CalEvent } from './types'
+import type { CalEvent, Calendar } from './types'
+import { insert, remove, select, update } from './db'
 
 /** Lê (só leitura) as agendas e eventos do Google com o token que o Google deu no login. */
 const API = 'https://www.googleapis.com/calendar/v3'
@@ -33,7 +34,7 @@ async function get<T>(token: string, path: string, params: Record<string, string
   return r.json() as Promise<T>
 }
 
-interface GCal { id: string; summary: string; selected?: boolean; primary?: boolean; accessRole: string }
+export interface GCal { id: string; summary: string; summaryOverride?: string; selected?: boolean; primary?: boolean; accessRole: string; backgroundColor?: string }
 interface GEvent {
   id: string; status: string; summary?: string; location?: string; description?: string; htmlLink?: string
   start: { date?: string; dateTime?: string }; end: { date?: string; dateTime?: string }
@@ -94,4 +95,20 @@ export function toRow(e: GEvent, c: GCal): Partial<CalEvent> | null {
     starts_at: starts, ends_at: ends, all_day: allDay, kind: 'appointment',
     location: clip(e.location, 200), notes: clip(notes, 5000),
   }
+}
+
+/** Guarda as agendas do Google: novas entram visíveis só se estão marcadas no Google; as que você já ajustou mantêm a escolha. */
+export async function syncCalendars(cals: GCal[]) {
+  const existing = (await select<Calendar>('calendars')).filter((c) => c.external_id.startsWith('gcal:'))
+  const seen = new Set<string>()
+  for (const [i, c] of cals.entries()) {
+    const key = `gcal:${c.id}`.slice(0, 300)
+    seen.add(key)
+    const name = (c.summaryOverride || c.summary || 'Agenda').slice(0, 200)
+    const color = /^#[0-9a-fA-F]{6}$/.test(c.backgroundColor ?? '') ? c.backgroundColor! : null
+    const row = existing.find((x) => x.external_id === key)
+    if (row) { if (row.name !== name || row.color !== color || row.position !== i) await update<Calendar>('calendars', row.id, { name, color, position: i }) }
+    else await insert<Calendar>('calendars', { external_id: key, name, color, visible: !!(c.selected || c.primary), position: i })
+  }
+  for (const row of existing) if (!seen.has(row.external_id)) await remove('calendars', row.id)
 }

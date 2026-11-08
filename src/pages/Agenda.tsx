@@ -1,40 +1,49 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { addMonths, endOfMonth, startOfMonth } from 'date-fns'
 import { insert, remove, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, hhmm, isSameDay, toIso, todayYmd, weekDays, weekStart, ymd } from '../lib/dates'
+import { layoutDay, useCalendars } from '../lib/calendars'
 import type { Area, CalEvent } from '../lib/types'
 import { Sheet, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 
 type View = 'dia' | 'semana' | 'mes'
-const HOURS = Array.from({ length: 17 }, (_, i) => i + 7) // 07h–23h
+const HOURS = Array.from({ length: 24 }, (_, i) => i)
 const HOUR_PX = 48
+type Paint = (e: CalEvent) => { fg: string; bg: string }
 
 export function Agenda() {
   const [sp, setSp] = useSearchParams()
   const { profile } = useAuth()
   const ws = profile?.week_starts_on ?? 1
-  const view = (sp.get('v') as View) || (window.matchMedia('(min-width: 1024px)').matches ? 'semana' : 'dia')
+  const desktop = window.matchMedia('(min-width: 1024px)').matches
+  const view = (sp.get('v') as View) || (desktop ? 'semana' : 'dia')
   const date = sp.get('d') ? fromYmd(sp.get('d')!) : new Date()
   const setParam = (k: string, v: string | null) => { const n = new URLSearchParams(sp); if (v == null) n.delete(k); else n.set(k, v); setSp(n, { replace: true }) }
+  const [calsOpen, setCalsOpen] = useState(false)
+  const [panel, setPanel] = useState(() => { try { return localStorage.getItem('agenda-panel') !== '0' } catch { return true } })
+  const togglePanel = () => { const v = !panel; setPanel(v); try { localStorage.setItem('agenda-panel', v ? '1' : '0') } catch { /* */ } }
 
   const range = useMemo(() => {
     if (view === 'dia') return [date, addDays(date, 1)]
     if (view === 'semana') { const s = weekStart(date, ws); return [s, addDays(s, 7)] }
     const s = weekStart(startOfMonth(date), ws); return [s, addDays(s, 42)]
   }, [view, date.getTime(), ws]) // eslint-disable-line react-hooks/exhaustive-deps
-  const { rows: events } = useRows<CalEvent>('events', { gte: { starts_at: range[0].toISOString() }, lt: { starts_at: range[1].toISOString() }, order: { column: 'starts_at' } })
+  const { rows: all } = useRows<CalEvent>('events', { gte: { starts_at: range[0].toISOString() }, lt: { starts_at: range[1].toISOString() }, order: { column: 'starts_at' } })
   const { rows: areas } = useRows<Area>('areas', { eq: { archived: false }, order: { column: 'position' } })
-  const colorOf = (e: CalEvent) => areas.find((a) => a.id === e.area_id)?.color ?? 'neutro'
+  const cals = useCalendars(areas)
+  const events = all.filter(cals.visible)
+  const hiddenCount = cals.list.filter((c) => !c.visible).length
 
   const editing = sp.get('evento'), creating = sp.get('novo')
-  const current = events.find((e) => e.id === editing) ?? null
+  const current = all.find((e) => e.id === editing) ?? null
   const step = (dir: number) => setParam('d', ymd(view === 'mes' ? addMonths(date, dir) : addDays(date, view === 'semana' ? 7 * dir : dir)))
 
   const title = view === 'mes' ? fmt(date, 'MMMM yyyy') : view === 'semana' ? `${fmt(weekStart(date, ws), 'd MMM')} – ${fmt(addDays(weekStart(date, ws), 6), 'd MMM')}` : fmt(date, "EEEE, d 'de' MMMM")
+  const showPanel = desktop && panel && cals.list.length > 1
 
   return (
     <div className="page wide">
@@ -45,7 +54,12 @@ export function Agenda() {
           <button className="icon-btn" aria-label="Próximo" onClick={() => step(1)}><Icon name="chevron" size={16} /></button>
           <button className="btn secondary small" onClick={() => setParam('d', null)}>Hoje</button>
         </div>
-        <div className="row">
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          {cals.list.length > 1 && (
+            <button className="btn secondary small" aria-pressed={desktop ? panel : calsOpen} onClick={() => (desktop ? togglePanel() : setCalsOpen(true))}>
+              <Icon name="list" size={16} />Agendas{hiddenCount ? ` · ${cals.list.length - hiddenCount} de ${cals.list.length}` : ''}
+            </button>
+          )}
           <div className="seg" role="tablist" aria-label="Visão">
             {(['dia', 'semana', 'mes'] as View[]).map((v) => <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'on' : ''} onClick={() => setParam('v', v)}>{v === 'mes' ? 'Mês' : v[0].toUpperCase() + v.slice(1)}</button>)}
           </div>
@@ -53,11 +67,16 @@ export function Agenda() {
         </div>
       </header>
 
-      {view === 'mes' ? (
-        <Month date={date} ws={ws} events={events} colorOf={colorOf} onPick={(d) => { const n = new URLSearchParams(sp); n.set('v', 'dia'); n.set('d', ymd(d)); setSp(n) }} />
-      ) : (
-        <TimeGrid days={view === 'dia' ? [date] : weekDays(date, ws)} events={events} colorOf={colorOf} onOpen={(id) => setParam('evento', id)} onNew={(d) => setParam('novo', ymd(d))} />
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: showPanel ? '220px minmax(0, 1fr)' : 'minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+        {showPanel && <div className="card" style={{ padding: 8, position: 'sticky', top: 16 }}><CalendarList cals={cals} /></div>}
+        {view === 'mes' ? (
+          <Month date={date} ws={ws} events={events} paint={cals.paint} onPick={(d) => { const n = new URLSearchParams(sp); n.set('v', 'dia'); n.set('d', ymd(d)); setSp(n) }} />
+        ) : (
+          <TimeGrid days={view === 'dia' ? [date] : weekDays(date, ws)} events={events} paint={cals.paint} onOpen={(id) => setParam('evento', id)} onNew={(d) => setParam('novo', ymd(d))} />
+        )}
+      </div>
+
+      <Sheet open={calsOpen} onClose={() => setCalsOpen(false)} title="Agendas" labelledBy="cals-sheet"><CalendarList cals={cals} /></Sheet>
 
       <Sheet open={!!(current || creating)} onClose={() => { const n = new URLSearchParams(sp); n.delete('evento'); n.delete('novo'); setSp(n, { replace: true }) }}
         title={current ? 'Compromisso' : 'Novo compromisso'} labelledBy="ev-title">
@@ -68,11 +87,31 @@ export function Agenda() {
   )
 }
 
-function TimeGrid({ days, events, colorOf, onOpen, onNew }: { days: Date[]; events: CalEvent[]; colorOf: (e: CalEvent) => string; onOpen: (id: string) => void; onNew: (d: Date) => void }) {
-  const now = new Date()
+function CalendarList({ cals }: { cals: ReturnType<typeof useCalendars> }) {
+  const allOn = cals.list.every((c) => c.visible)
   return (
-    <div className="card" style={{ padding: 12, overflowX: 'auto' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `36px repeat(${days.length}, minmax(0, 1fr))` }}>
+    <div className="stack" style={{ gap: 2 }}>
+      {cals.list.map((c) => (
+        <label key={c.key} className="row cal-item" style={{ gap: 10, padding: '7px 8px', borderRadius: 10, cursor: 'pointer' }}>
+          <input type="checkbox" checked={c.visible} onChange={(e) => cals.toggle(c.key, e.target.checked)} className="cal-check"
+            style={{ ['--cal' as string]: c.color ?? 'var(--ink)' }} />
+          <span className="grow caption" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.name}>{c.name}</span>
+        </label>
+      ))}
+      <button className="caption muted" style={{ textAlign: 'left', padding: '8px 8px 4px' }}
+        onClick={() => cals.list.forEach((c) => c.visible !== !allOn && cals.toggle(c.key, !allOn))}>{allOn ? 'Esconder todas' : 'Mostrar todas'}</button>
+    </div>
+  )
+}
+
+function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events: CalEvent[]; paint: Paint; onOpen: (id: string) => void; onNew: (d: Date) => void }) {
+  const now = new Date()
+  const scroller = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = 7 * HOUR_PX - 8 }, [])
+  const cols = `36px repeat(${days.length}, minmax(0, 1fr))`
+  return (
+    <div className="card" style={{ padding: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols }}>
         <div />
         {days.map((d) => (
           <button key={d.toISOString()} onClick={() => onNew(d)} className="stack" style={{ alignItems: 'center', gap: 2, paddingBottom: 8 }} aria-label={`Novo em ${fmt(d, 'd MMM')}`}>
@@ -80,41 +119,49 @@ function TimeGrid({ days, events, colorOf, onOpen, onNew }: { days: Date[]; even
             <span className="medium" style={isSameDay(d, now) ? { background: 'var(--ink)', color: 'var(--on-ink)', borderRadius: '50%', width: 28, height: 28, display: 'grid', placeItems: 'center' } : { height: 28, display: 'grid', placeItems: 'center' }}>{fmt(d, 'd')}</span>
           </button>
         ))}
-        {/* eventos de dia inteiro */}
         <div className="mono faint" style={{ fontSize: 10, paddingTop: 2 }}>dia</div>
         {days.map((d) => (
-          <div key={'ad' + d.toISOString()} className="stack" style={{ gap: 2, padding: '0 2px 6px' }}>
-            {events.filter((e) => e.all_day && isSameDay(new Date(e.starts_at), d)).map((e) => (
-              <button key={e.id} onClick={() => onOpen(e.id)} className="caption" style={{ textAlign: 'left', borderRadius: 6, padding: '2px 6px', background: `var(--${colorOf(e)}-bg)`, color: `var(--${colorOf(e)}-fg)`, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{e.title}</button>
-            ))}
-          </div>
-        ))}
-        <div>{HOURS.map((h) => <div key={h} className="cal-hour">{String(h).padStart(2, '0')}</div>)}</div>
-        {days.map((d) => (
-          <div key={'c' + d.toISOString()} style={{ position: 'relative', borderLeft: '1px solid var(--border)' }}>
-            {HOURS.map((h) => <div key={h} className="cal-hour" />)}
-            {isSameDay(d, now) && now.getHours() >= 7 && <div style={{ position: 'absolute', left: 0, right: 0, top: (now.getHours() - 7 + now.getMinutes() / 60) * HOUR_PX, height: 2, background: 'var(--ink)' }} />}
-            {events.filter((e) => !e.all_day && isSameDay(new Date(e.starts_at), d)).map((e) => {
-              const s = new Date(e.starts_at), en = new Date(e.ends_at)
-              const top = Math.max(0, (s.getHours() - 7 + s.getMinutes() / 60) * HOUR_PX)
-              const h = Math.max(22, ((en.getTime() - s.getTime()) / 36e5) * HOUR_PX - 2)
-              const c = colorOf(e)
-              return (
-                <button key={e.id} onClick={() => onOpen(e.id)} className={'cal-event ' + e.kind}
-                  style={{ top, height: h, left: 2, right: 2, ...(e.kind === 'plan' ? { background: `var(--${c}-bg)`, color: `var(--${c}-fg)` } : { ['--ev-fg' as string]: `var(--${c}-fg)` }) }}>
-                  <div className="medium" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</div>
-                  {h > 34 && <div style={{ opacity: 0.8 }}>{hhmm(e.starts_at)}</div>}
-                </button>
-              )
+          <div key={'ad' + d.toISOString()} className="stack" style={{ gap: 2, padding: '0 2px 6px', maxHeight: 112, overflowY: 'auto' }}>
+            {events.filter((e) => e.all_day && isSameDay(new Date(e.starts_at), d)).map((e) => {
+              const p = paint(e)
+              return <button key={e.id} onClick={() => onOpen(e.id)} className="caption" title={e.title} style={{ textAlign: 'left', borderRadius: 6, padding: '2px 6px', background: p.bg, color: 'var(--text-primary)', boxShadow: `inset 3px 0 0 ${p.fg}`, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 'none' }}>{e.title}</button>
             })}
           </div>
         ))}
+      </div>
+      <div ref={scroller} style={{ display: 'grid', gridTemplateColumns: cols, maxHeight: 'max(420px, calc(100vh - 300px))', overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+        <div>{HOURS.map((h) => <div key={h} className="cal-hour">{String(h).padStart(2, '0')}</div>)}</div>
+        {days.map((d) => {
+          const timed = events.filter((e) => !e.all_day && isSameDay(new Date(e.starts_at), d))
+          const lay = layoutDay(timed)
+          return (
+            <div key={'c' + d.toISOString()} style={{ position: 'relative', borderLeft: '1px solid var(--border)' }}>
+              {HOURS.map((h) => <div key={h} className="cal-hour" />)}
+              {isSameDay(d, now) && <div style={{ position: 'absolute', left: 0, right: 0, top: (now.getHours() + now.getMinutes() / 60) * HOUR_PX, height: 2, background: 'var(--danger)', zIndex: 2 }} />}
+              {timed.map((e) => {
+                const s = new Date(e.starts_at), en = new Date(e.ends_at)
+                const top = (s.getHours() + s.getMinutes() / 60) * HOUR_PX
+                const endH = isSameDay(en, s) ? en.getHours() + en.getMinutes() / 60 : 24
+                const h = Math.max(20, (endH - (s.getHours() + s.getMinutes() / 60)) * HOUR_PX - 2)
+                const { col, cols: n } = lay.get(e.id) ?? { col: 0, cols: 1 }
+                const p = paint(e)
+                return (
+                  <button key={e.id} onClick={() => onOpen(e.id)} className={'cal-event ' + e.kind} title={`${hhmm(e.starts_at)} ${e.title}`}
+                    style={{ top, height: h, left: `calc(${(col * 100) / n}% + 2px)`, width: `calc(${100 / n}% - 4px)`, ...(e.kind === 'plan' ? { background: p.bg, color: 'var(--text-primary)' } : { ['--ev-fg' as string]: p.fg, background: `color-mix(in srgb, ${p.fg} 10%, var(--bg-surface))` }) }}>
+                    <div className="medium" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</div>
+                    {h > 34 && <div style={{ opacity: 0.75 }}>{hhmm(e.starts_at)}</div>}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function Month({ date, ws, events, colorOf, onPick }: { date: Date; ws: number; events: CalEvent[]; colorOf: (e: CalEvent) => string; onPick: (d: Date) => void }) {
+function Month({ date, ws, events, paint, onPick }: { date: Date; ws: number; events: CalEvent[]; paint: Paint; onPick: (d: Date) => void }) {
   const start = weekStart(startOfMonth(date), ws)
   const end = endOfMonth(date)
   const days = Array.from({ length: 42 }, (_, i) => addDays(start, i))
@@ -129,7 +176,11 @@ function Month({ date, ws, events, colorOf, onPick }: { date: Date; ws: number; 
           return (
             <button key={d.toISOString()} className={'day' + (out ? ' out' : '') + (isSameDay(d, new Date()) ? ' today' : '')} onClick={() => onPick(d)} aria-label={`${fmt(d, "d 'de' MMMM")}, ${evs.length} eventos`}>
               <span className="num caption medium">{fmt(d, 'd')}</span>
-              <span className="dots">{evs.slice(0, 6).map((e) => <span key={e.id} className="dot" style={{ background: `var(--${colorOf(e)}-fg)` }} />)}</span>
+              <span className="month-evs">
+                {evs.slice(0, 3).map((e) => <span key={e.id} className="month-ev" style={{ boxShadow: `inset 2px 0 0 ${paint(e).fg}` }}>{e.title}</span>)}
+                {evs.length > 3 && <span className="caption muted">+{evs.length - 3}</span>}
+              </span>
+              <span className="dots">{evs.slice(0, 6).map((e) => <span key={e.id} className="dot" style={{ background: paint(e).fg }} />)}</span>
             </button>
           )
         })}

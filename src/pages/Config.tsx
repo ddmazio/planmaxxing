@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { DEMO, exportAll, insert, syncExternalEvents, update } from '../lib/db'
 import { useRows } from '../lib/hooks'
 import { CURRENCIES } from '../lib/money'
-import { fetchEvents, getToken, listCalendars } from '../lib/gcal'
+import { fetchEvents, getToken, listCalendars, syncCalendars } from '../lib/gcal'
 import { fmt } from '../lib/dates'
 import type { Area, AreaColor } from '../lib/types'
 import { Toggle } from '../components/ui'
@@ -162,7 +162,12 @@ function GoogleAgenda() {
     if (!token) { await connectGoogleCalendar(); return }
     setState({ busy: true, msg: 'Lendo suas agendas…', err: false })
     try {
-      const cals = (await listCalendars(token)).filter((c) => c.selected !== false || c.primary)
+      const cals = await listCalendars(token)
+      try { await syncCalendars(cals) } catch (e) {
+        const m = e instanceof Error ? e.message : String(e)
+        if (/calendars/.test(m)) throw new Error('Falta rodar no Supabase o arquivo 20261108030000_agendas.sql.')
+        throw e
+      }
       setState({ busy: true, msg: `Trazendo eventos de ${cals.length} agenda${cals.length === 1 ? '' : 's'}…`, err: false })
       const { rows, timeMin, timeMax } = await fetchEvents(token, cals)
       const r = await syncExternalEvents(rows, 'gcal:', timeMin, timeMax)
@@ -195,7 +200,7 @@ function GoogleAgenda() {
       <div className="card stack" style={{ gap: 10 }}>
         <div className="row"><Icon name="calendar" /><span className="grow medium">Trazer meus eventos do Google</span></div>
         <p className="caption muted" style={{ margin: 0 }}>
-          Copia para a sua Agenda os eventos de 1 mês atrás até 12 meses à frente, de todas as agendas visíveis no seu Google. O app só lê: nada muda no Google. Importar de novo atualiza e não duplica.
+          Copia para a sua Agenda os eventos de 1 mês atrás até 12 meses à frente, de todas as suas agendas do Google. Na Agenda do app você escolhe quais mostrar. O app só lê: nada muda no Google. Importar de novo atualiza e não duplica.
         </p>
         {DEMO ? <span className="caption muted">Disponível só com a conta online.</span> : (
           <button className="btn primary" disabled={state.busy} onClick={run}>{state.busy ? 'Importando…' : last ? 'Atualizar do Google' : 'Importar do Google Agenda'}</button>
