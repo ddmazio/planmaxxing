@@ -31,12 +31,16 @@ export function Hoje() {
 
   return (
     <div className="page wide">
-      <header className="row between">
-        <div className="stack" style={{ gap: 2 }}>
+      <header className="row between" style={{ alignItems: 'flex-start' }}>
+        <div className="stack grow" style={{ gap: 2 }}>
           <span className="mono muted">{longDay(now)}</span>
-          <h1 className="h1">{greeting(now)}{profile?.display_name ? `, ${profile.display_name}` : ''}</h1>
+          <h1 className="h1">{greeting(now)}{profile?.display_name ? `, ${profile.display_name.split(' ')[0]}` : ''}</h1>
         </div>
-        <button className="btn primary small" onClick={openQuick}><Icon name="plus" size={16} />Novo</button>
+        <button className="btn primary small desktop-only" onClick={openQuick}><Icon name="plus" size={16} />Novo</button>
+        <div className="row mobile-only" style={{ gap: 8 }}>
+          <Link to="/grupo" className="icon-btn" aria-label="Grupo"><Icon name="users" size={18} /></Link>
+          <Link to="/config" className="icon-btn ink" aria-label="Configurações" style={{ fontWeight: 500 }}>{(profile?.display_name || '?').charAt(0).toUpperCase()}</Link>
+        </div>
       </header>
 
       <div className="grid2">

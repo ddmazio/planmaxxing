@@ -166,3 +166,5 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 }
 .seg.small button { height: 30px; padding: 0 10px; font-size: 13px; }
 .blob { max-width: 120px; }
+@media (min-width: 1024px) { .mobile-only { display: none !important; } }
+@media (max-width: 1023px) { .desktop-only { display: none !important; } }
