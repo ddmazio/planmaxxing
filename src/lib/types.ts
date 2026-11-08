@@ -54,3 +54,19 @@ export interface Query {
   lt?: Record<string, string | number>
   order?: { column: string; ascending?: boolean }
 }
+
+export interface Cycle extends Owned {
+  name: string; starts_on: string; ends_on: string; status: 'planning' | 'active' | 'closed'
+  words: string[]; who_is_she: string[]
+}
+export interface Goal extends Owned {
+  cycle_id: string; area_id: string | null; title: string; done_definition: string | null
+  kind: 'project' | 'habit' | 'both'; position: number
+}
+export interface Step extends Owned {
+  goal_id: string; title: string; week: number; detail: string | null; done_at: string | null; position: number
+}
+export interface Reflection extends Owned {
+  cycle_id: string | null; kind: 'review' | 'checkin' | 'journal' | 'reset'; week: number | null
+  prompt: string | null; answers: string[]; title: string | null; score: number | null
+}

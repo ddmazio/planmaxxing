@@ -61,7 +61,7 @@ export interface ShellCtx { openQuick: () => void; toast: (m: string) => void }
 
 export function PageHeader({ eyebrow, title, right }: { eyebrow?: string; title: ReactNode; right?: ReactNode }) {
   return (
-    <header className="row between" style={{ alignItems: 'flex-end' }}>
+    <header className="row between" style={{ alignItems: 'flex-end', flexWrap: 'wrap', rowGap: 12 }}>
       <div className="stack" style={{ gap: 2 }}>
         {eyebrow && <span className="mono muted">{eyebrow}</span>}
         <h1 className="h1">{title}</h1>

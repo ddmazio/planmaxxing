@@ -14,7 +14,7 @@ Sem as chaves do Supabase, o app abre em **modo demonstração**: tudo funciona,
 |---|---|---|
 | 1 | Base segura, login, onboarding, Hoje, Tarefas (listas, etapas, repetir), Agenda (dia/semana/mês), entrada rápida (+), hábitos, configurações, exportar e apagar conta | ✅ |
 | 2 | Finanças: resumo 50/30/20, lançamentos, regra, moedas, sequência no azul | próxima |
-| 3 | Ciclo: plano, metas, passos, ritual em 3 partes, páginas das áreas, reflexões | |
+| 3 | Ciclo: plano, metas, passos, ritual em 3 partes, páginas das áreas, reflexões | ✅ |
 | 4 | Grupo e partilha: convites, check-in, listas partilhadas | |
 
 O banco (`supabase/migrations`) já está pronto para as 4 etapas.

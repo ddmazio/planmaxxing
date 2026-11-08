@@ -15,7 +15,8 @@ import { Hoje } from './pages/Hoje'
 import { Tarefas, TarefaRoute } from './pages/Tarefas'
 import { Agenda } from './pages/Agenda'
 import { Config, applyTheme, savedTheme } from './pages/Config'
-import { Ciclo, Financas } from './pages/EmBreve'
+import { Financas } from './pages/EmBreve'
+import { AreaPage, Ciclo, Ritual } from './pages/Ciclo'
 import { DEMO } from './lib/db'
 
 applyTheme(savedTheme())
@@ -36,7 +37,9 @@ function Gate() {
         <Route path="tarefas/:key" element={<Tarefas />} />
         <Route path="tarefa/:id" element={<TarefaRoute />} />
         <Route path="financas" element={<Financas />} />
-        <Route path="ciclo/*" element={<Ciclo />} />
+        <Route path="ciclo" element={<Ciclo />} />
+        <Route path="ciclo/ritual" element={<Ritual />} />
+        <Route path="ciclo/area/:id" element={<AreaPage />} />
         <Route path="config" element={<Config />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

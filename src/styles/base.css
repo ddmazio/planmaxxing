@@ -141,3 +141,17 @@ textarea.input { resize: vertical; min-height: 90px; }
 .empty { padding: 20px; border-radius: var(--r-lg); border: 1.5px dashed var(--border); color: var(--text-secondary); text-align: center; }
 .banner { padding: 10px 14px; border-radius: 14px; background: var(--lime-soft); font-size: 13px; line-height: 18px; }
 .toast { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); background: #141414; color: #fff; padding: 10px 16px; border-radius: 14px; z-index: 60; font-size: 14px; }
+
+/* ciclo */
+.weeks { display: grid; grid-template-columns: repeat(13, 1fr); gap: 4px; }
+.weeks > * { height: 8px; border-radius: 4px; background: var(--border); }
+.weeks > .past { background: var(--text-tertiary); }
+.weeks > .now { background: var(--lime); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.weeks > .review { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border); }
+.bar { height: 6px; border-radius: 3px; background: var(--bg-muted); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--ink); border-radius: 3px; }
+input[type='range'] { width: 100%; accent-color: var(--ink); }
+.wordchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wordchips span { padding: 4px 12px; border-radius: var(--r-full); background: var(--bg-surface); font-family: var(--font-serif); font-size: 18px; }
+.step-no { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); width: 28px; flex: none; }
+.ritual-num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-size: 13px; font-weight: 500; flex: none; }

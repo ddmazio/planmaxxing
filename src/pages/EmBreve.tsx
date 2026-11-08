@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { useRows } from '../lib/hooks'
 import { useAuth } from '../lib/auth'
 import { money } from '../lib/money'
@@ -17,16 +16,6 @@ export function Financas() {
           <div key={e.id} className="list-row"><span className="grow">{e.item}</span><span className="caption muted">{e.spent_on}</span><span className="medium">− {money(e.amount_cents, profile?.currency_main)}</span></div>
         )) : <div className="list-row muted caption">Nenhum gasto ainda. Experimente “almoço 12,50” no +.</div>}
       </div>
-    </div>
-  )
-}
-
-export function Ciclo() {
-  return (
-    <div className="page">
-      <PageHeader eyebrow="Etapa 3" title="Ciclo" />
-      <div className="card soft caption">Plano do ciclo, metas, passos da semana, ritual em 3 partes, páginas das áreas e reflexões chegam na etapa 3. O grupo e a partilha, na etapa 4.</div>
-      <Link className="btn secondary" to="/">Voltar ao Hoje</Link>
     </div>
   )
 }

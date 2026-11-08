@@ -9,6 +9,8 @@ import { TaskRow } from '../components/TaskRow'
 import { Check, Empty, SectionHead } from '../components/ui'
 import { Icon } from '../components/Icon'
 import type { ShellCtx } from '../components/Shell'
+import { useWeekSteps } from './Ciclo'
+import { AreaTag } from '../components/ui'
 
 export function Hoje() {
   const { profile } = useAuth()
@@ -22,6 +24,7 @@ export function Hoje() {
   const { rows: habits } = useRows<Habit>('habits', { eq: { archived: false } })
   const { rows: logs } = useRows<HabitLog>('habit_logs', { eq: { day: today } })
 
+  const ws = useWeekSteps()
   const todays = tasks.filter(isToday).sort((a, b) => Number(b.important) - Number(a.important))
   const habitsToday = habits.filter((h) => h.days.includes(now.getDay()))
   const areaOf = (id: string | null) => areas.find((a) => a.id === id)
@@ -77,9 +80,22 @@ export function Hoje() {
             {todays.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} />)}
             <button className="list-row muted" onClick={openQuick}><Icon name="plus" size={18} />Adicionar tarefa para hoje</button>
           </div>
-          <div className="card soft caption">
-            <b>Passos da semana</b> chegam com o Ciclo, na etapa 3. Por enquanto, o Hoje junta agenda, tarefas e hábitos.
-          </div>
+          <SectionHead title={ws.cycle && ws.week >= 1 && ws.week <= 12 ? `Passos da semana ${ws.week}` : 'Passos da semana'} action={<Link className="caption muted" to="/ciclo">ciclo ›</Link>} />
+          {!ws.cycle ? <Empty>Sem ciclo em curso. <Link className="link" to="/ciclo">Criar meu ciclo de 12 semanas</Link></Empty>
+            : ws.items.length ? (
+              <div className="card flush list">
+                {ws.items.map(({ step, goal, area }) => (
+                  <div key={step.id} className="list-row">
+                    <Check done={!!step.done_at} onToggle={() => ws.toggle!(step)} label={step.done_at ? `Desmarcar ${step.title}` : `Concluir ${step.title}`} />
+                    <div className="grow stack" style={{ gap: 2 }}>
+                      <span className={step.done_at ? 'done-text' : ''}>{step.title}</span>
+                      {goal && <span className="caption muted">{goal.title}</span>}
+                    </div>
+                    <AreaTag area={area} />
+                  </div>
+                ))}
+              </div>
+            ) : <Empty>Nenhum passo planejado para esta semana. <Link className="link" to="/ciclo/ritual">Fazer o ritual</Link></Empty>}
         </div>
       </div>
     </div>
