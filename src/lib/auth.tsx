@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Session } from '@supabase/supabase-js'
 import { DEMO, insert, select, supabase, update, wipeLocal } from './db'
 import type { Area, Profile } from './types'
+import { saveToken } from './gcal'
 
 interface AuthState {
   ready: boolean
@@ -10,6 +11,7 @@ interface AuthState {
   profile: Profile | null
   saveProfile: (p: Partial<Profile>) => Promise<void>
   signInGoogle: () => Promise<void>
+  connectGoogleCalendar: () => Promise<void>
   signInEmail: (email: string) => Promise<void>
   startDemo: () => Promise<void>
   signOut: () => Promise<void>
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true)
     })
     const { data: sub } = supabase!.auth.onAuthStateChange((_e, s) => {
+      if (s?.provider_token) saveToken(s.provider_token)
       setSession(s)
       if (s) loadProfile().catch(() => setProfile(null))
       else setProfile(null)
@@ -83,6 +86,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase!.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
     if (error) throw error
   }
+  /** Pede ao Google permissão só de leitura da agenda. Volta para /config?gcal=1. */
+  const connectGoogleCalendar = async () => {
+    try { localStorage.setItem('gcal-expect-user', session?.user.id ?? '') } catch { /* */ }
+    const { error } = await supabase!.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/config?gcal=1`,
+        scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+        queryParams: { prompt: 'consent', include_granted_scopes: 'true' },
+      },
+    })
+    if (error) throw error
+  }
   const signInEmail = async (email: string) => {
     const { error } = await supabase!.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin, shouldCreateUser: true } })
     if (error) throw error
@@ -99,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Ctx.Provider value={{ ready, session, demo: DEMO && demoOn, profile, saveProfile, signInGoogle, signInEmail, startDemo, signOut, deleteAccount }}>
+    <Ctx.Provider value={{ ready, session, demo: DEMO && demoOn, profile, saveProfile, signInGoogle, connectGoogleCalendar, signInEmail, startDemo, signOut, deleteAccount }}>
       {children}
     </Ctx.Provider>
   )

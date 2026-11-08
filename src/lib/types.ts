@@ -34,6 +34,7 @@ export interface TaskItem extends Base { task_id: string; title: string; done: b
 export interface CalEvent extends Owned {
   title: string; starts_at: string; ends_at: string; all_day: boolean; kind: 'plan' | 'appointment'
   area_id: string | null; location: string | null; notes: string | null; reminder_minutes: number | null
+  external_id?: string | null
 }
 
 export interface Habit extends Owned { area_id: string | null; title: string; days: number[]; archived: boolean }

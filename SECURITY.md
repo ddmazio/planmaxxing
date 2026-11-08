@@ -12,6 +12,7 @@
 - **Finanças nunca são partilhadas**: as tabelas de renda, gastos, potes, assinaturas e regra não têm nenhuma política de grupo.
 - No check-in do grupo, cada pessoa escolhe o que mostrar (nada, só o placar, ou tudo). Ninguém lê a tabela de check-ins dos outros: o grupo só vê pela função `group_scores`, que respeita essa escolha.
 - Ao sair de um grupo, a pessoa perde o acesso às listas partilhadas por quem estava nele.
+- Google Agenda: o app pede só permissão de **leitura** (`calendar.readonly`). O token do Google fica só na aba aberta (sessionStorage), vale 1 hora e não vai para o banco. Os eventos importados ficam protegidos pelas mesmas regras de dono.
 - O câmbio de moedas é digitado por você: o app não chama nenhum serviço de terceiros.
 - Colegas de grupo só veem o seu nome (`group_profiles`). E-mail, data de nascimento e fuso não saem do seu perfil.
 - Limites de tamanho e formato em todos os campos de texto, valores e datas, para impedir abuso.

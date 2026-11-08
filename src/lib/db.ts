@@ -169,3 +169,35 @@ export async function rpc<T>(fn: string, args?: Record<string, unknown>): Promis
 }
 
 export function touch(table: TableName) { notify(table) }
+
+/** Importa eventos de fora (Google): cria ou atualiza pelo external_id e apaga os que sumiram na janela. */
+export async function syncExternalEvents(rows: Record<string, unknown>[], prefix: string, from: string, to: string) {
+  const ids = new Set(rows.map((r) => r.external_id as string))
+  const existing = (await select<{ id: string; external_id: string | null; starts_at: string }>('events', { gte: { starts_at: from }, lt: { starts_at: to } }))
+    .filter((e) => e.external_id?.startsWith(prefix))
+  const stale = existing.filter((e) => !ids.has(e.external_id!))
+  if (DEMO) {
+    const all = await localAll('events')
+    for (const r of rows) {
+      const i = all.findIndex((x) => x.external_id === r.external_id)
+      if (i >= 0) all[i] = { ...all[i], ...r, updated_at: now() } as Row
+      else all.push({ id: uuid(), created_at: now(), updated_at: now(), owner_id: 'demo', area_id: null, reminder_minutes: null, ...r } as Row)
+    }
+    await localSave('events', all.filter((x) => !stale.some((s) => s.id === x.id)))
+    notify('events')
+    return { saved: rows.length, removed: stale.length }
+  }
+  const { data } = await supabase!.auth.getUser()
+  if (!data.user) throw new Error('not authenticated')
+  for (let i = 0; i < rows.length; i += 200) {
+    const chunk = rows.slice(i, i + 200).map((r) => ({ ...r, owner_id: data.user!.id }))
+    const { error } = await supabase!.from('events').upsert(chunk as never, { onConflict: 'owner_id,external_id' })
+    if (error) throw error
+  }
+  for (let i = 0; i < stale.length; i += 100) {
+    const { error } = await supabase!.from('events').delete().in('id', stale.slice(i, i + 100).map((s) => s.id))
+    if (error) throw error
+  }
+  notify('events')
+  return { saved: rows.length, removed: stale.length }
+}

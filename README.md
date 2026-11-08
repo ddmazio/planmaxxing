@@ -31,10 +31,11 @@ npm run build      # gera /dist
 ## Ligar ao Supabase (uma vez)
 
 1. Em [supabase.com](https://supabase.com), crie um projeto na região **EU (Frankfurt ou Paris)**. Guarde a senha do banco num gerenciador de senhas.
-2. **SQL Editor → New query**: cole e rode, nesta ordem, cada arquivo de `supabase/migrations/` (`20261108000000_schema.sql`, depois `20261108010000_grupo_privacidade.sql`).
+2. **SQL Editor → New query**: cole e rode, nesta ordem, cada arquivo de `supabase/migrations/` (`20261108000000_schema.sql`, `20261108010000_grupo_privacidade.sql`, `20261108020000_google_agenda.sql`).
 3. **Authentication → Providers**:
    - **Email**: ligado, com "Confirm email" ligado.
    - **Google**: ligado. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crie um "OAuth client ID" (Web) e use como redirect `https://SEU-PROJETO.supabase.co/auth/v1/callback`. Cole o Client ID e o Secret no Supabase.
+   - **Google Agenda (opcional)**: no Google Cloud, ative a *Google Calendar API* e, em *Data access*, adicione o escopo `.../auth/calendar.readonly`.
 4. **Authentication → URL Configuration**: em *Site URL* coloque o endereço do app (ex.: `https://planmaxxing.vercel.app`). Em *Redirect URLs* adicione esse mesmo endereço e `http://localhost:5173`.
 5. **Project Settings → API**: copie *Project URL* e a chave **anon public** para `.env.local` (veja `.env.example`). **Nunca** use a chave `service_role` no app.
 

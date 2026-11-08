@@ -156,6 +156,7 @@ function EventForm({ ev, day, areas, onDone }: { ev: CalEvent | null; day: strin
   }
   return (
     <form className="stack" onSubmit={(e) => { e.preventDefault(); save() }}>
+      {ev?.external_id?.startsWith('gcal:') && <div className="banner caption">Veio do Google Agenda. Se mudar aqui e importar de novo, volta a ficar como está no Google.</div>}
       <input id="ev-title" className="input" style={{ fontSize: 20 }} autoFocus placeholder="Consulta médica" value={f.title} maxLength={200} onChange={(e) => setF({ ...f, title: e.target.value })} aria-label="Título" />
       <div className="seg">{([['appointment', 'Compromisso'], ['plan', 'Bloco do plano']] as const).map(([k, l]) => <button type="button" key={k} className={f.kind === k ? 'on' : ''} onClick={() => setF({ ...f, kind: k })}>{l}</button>)}</div>
       <div className="row"><label className="field grow"><span>Data</span><input type="date" required className="input" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label></div>
