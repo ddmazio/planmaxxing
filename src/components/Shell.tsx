@@ -26,6 +26,7 @@ export function Shell() {
         {MAIN.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => 'nav-item' + (isActive(to) ? ' active' : '')}><Icon name={icon} />{label}</NavLink>
         ))}
+        <NavLink to="/grupo" className={() => 'nav-item' + (isActive('/grupo') || isActive('/convite') ? ' active' : '')}><Icon name="users" />Grupo</NavLink>
         <button className="nav-item" onClick={() => setQuick(true)}><Icon name="plus" />Novo</button>
         <div className="nav-section mono faint">Áreas da vida</div>
         {areas.map((a) => (

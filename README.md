@@ -13,9 +13,9 @@ Sem as chaves do Supabase, o app abre em **modo demonstração**: tudo funciona,
 | Etapa | O que entra | Estado |
 |---|---|---|
 | 1 | Base segura, login, onboarding, Hoje, Tarefas (listas, etapas, repetir), Agenda (dia/semana/mês), entrada rápida (+), hábitos, configurações, exportar e apagar conta | ✅ |
-| 2 | Finanças: resumo 50/30/20, lançamentos, regra, moedas, sequência no azul | próxima |
+| 2 | Finanças: resumo 50/30/20, lançamentos, regra, moedas, potes, assinaturas, sequência no azul | ✅ |
 | 3 | Ciclo: plano, metas, passos, ritual em 3 partes, páginas das áreas, reflexões | ✅ |
-| 4 | Grupo e partilha: convites, check-in, listas partilhadas | |
+| 4 | Grupo e partilha: convites, check-in, placar com privacidade, listas partilhadas | ✅ |
 
 O banco (`supabase/migrations`) já está pronto para as 4 etapas.
 
@@ -31,7 +31,7 @@ npm run build      # gera /dist
 ## Ligar ao Supabase (uma vez)
 
 1. Em [supabase.com](https://supabase.com), crie um projeto na região **EU (Frankfurt ou Paris)**. Guarde a senha do banco num gerenciador de senhas.
-2. **SQL Editor → New query**: cole todo o conteúdo de `supabase/migrations/20261108000000_schema.sql` e clique em **Run**.
+2. **SQL Editor → New query**: cole e rode, nesta ordem, cada arquivo de `supabase/migrations/` (`20261108000000_schema.sql`, depois `20261108010000_grupo_privacidade.sql`).
 3. **Authentication → Providers**:
    - **Email**: ligado, com "Confirm email" ligado.
    - **Google**: ligado. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crie um "OAuth client ID" (Web) e use como redirect `https://SEU-PROJETO.supabase.co/auth/v1/callback`. Cole o Client ID e o Secret no Supabase.

@@ -108,10 +108,64 @@ export async function remove(table: TableName, id: string): Promise<void> {
 
 /** Exporta tudo o que é seu (para o botão "Exportar tudo"). */
 export async function exportAll(): Promise<Record<string, unknown[]>> {
-  const tables: TableName[] = ['profiles', 'areas', 'lists', 'tasks', 'task_items', 'events', 'habits', 'habit_logs', 'cycles', 'goals', 'steps', 'reflections', 'incomes', 'expenses', 'pots', 'subscriptions', 'budget_rules']
+  const tables: TableName[] = ['profiles', 'areas', 'lists', 'tasks', 'task_items', 'events', 'habits', 'habit_logs', 'cycles', 'goals', 'steps', 'reflections', 'incomes', 'expenses', 'pots', 'subscriptions', 'budget_rules', 'groups', 'group_members', 'checkins']
   const out: Record<string, unknown[]> = {}
   for (const t of tables) out[t] = await select(t)
   return out
 }
 
 export async function wipeLocal() { for (const k of await keys()) if (String(k).startsWith(LOCAL_PREFIX)) await del(k) }
+
+/** Apaga linhas por filtro (para tabelas sem id, como list_members). */
+export async function removeWhere(table: TableName, eq: Record<string, string>): Promise<void> {
+  if (DEMO) {
+    await localSave(table, (await localAll(table)).filter((r) => !Object.entries(eq).every(([k, v]) => r[k] === v)))
+    notify(table); return
+  }
+  let req = supabase!.from(table).delete()
+  for (const [k, v] of Object.entries(eq)) req = req.eq(k, v)
+  const { error } = await req
+  if (error) throw error
+  notify(table)
+}
+
+/** Insere linha em tabela sem coluna id (list_members). */
+export async function insertPlain(table: TableName, values: Record<string, unknown>): Promise<void> {
+  if (DEMO) { const rows = await localAll(table); rows.push({ id: uuid(), ...values } as Row); await localSave(table, rows); notify(table); return }
+  const { error } = await supabase!.from(table).insert(values as never)
+  if (error) throw error
+  notify(table)
+}
+
+/** Atualiza linhas por filtro (group_members). */
+export async function updateWhere(table: TableName, eq: Record<string, string>, patch: Record<string, unknown>): Promise<void> {
+  if (DEMO) {
+    const rows = (await localAll(table)).map((r) => (Object.entries(eq).every(([k, v]) => r[k] === v) ? { ...r, ...patch } : r))
+    await localSave(table, rows as Row[]); notify(table); return
+  }
+  let req = supabase!.from(table).update(patch as never)
+  for (const [k, v] of Object.entries(eq)) req = req.eq(k, v)
+  const { error } = await req
+  if (error) throw error
+  notify(table)
+}
+
+/** Regra do orçamento: uma linha por pessoa (chave = owner_id). */
+export async function saveRule(rule: { needs_pct: number; wants_pct: number; savings_pct: number }): Promise<void> {
+  if (DEMO) { await localSave('budget_rules', [{ id: 'rule', ...rule }]); notify('budget_rules'); return }
+  const { data } = await supabase!.auth.getUser()
+  if (!data.user) throw new Error('not authenticated')
+  const { error } = await supabase!.from('budget_rules').upsert({ owner_id: data.user.id, ...rule })
+  if (error) throw error
+  notify('budget_rules')
+}
+
+/** Chama uma função do banco (RPC). Indisponível no modo demonstração. */
+export async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
+  if (DEMO) throw new Error('Disponível só com a conta online.')
+  const { data, error } = await supabase!.rpc(fn, args)
+  if (error) throw error
+  return data as T
+}
+
+export function touch(table: TableName) { notify(table) }

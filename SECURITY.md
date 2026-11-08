@@ -10,7 +10,9 @@
   - **listas partilhadas**: só o dono adiciona membros, e só pessoas que já estão num grupo com ele;
   - **grupos**: entrada só por convite. O convite é um token aleatório de 192 bits, guardado só como hash SHA-256, que expira em 7 dias e vale uma vez.
 - **Finanças nunca são partilhadas**: as tabelas de renda, gastos, potes, assinaturas e regra não têm nenhuma política de grupo.
-- No check-in do grupo, cada pessoa escolhe o que mostrar (nada, só o placar, ou tudo). A função `group_scores` respeita essa escolha.
+- No check-in do grupo, cada pessoa escolhe o que mostrar (nada, só o placar, ou tudo). Ninguém lê a tabela de check-ins dos outros: o grupo só vê pela função `group_scores`, que respeita essa escolha.
+- Ao sair de um grupo, a pessoa perde o acesso às listas partilhadas por quem estava nele.
+- O câmbio de moedas é digitado por você: o app não chama nenhum serviço de terceiros.
 - Colegas de grupo só veem o seu nome (`group_profiles`). E-mail, data de nascimento e fuso não saem do seu perfil.
 - Limites de tamanho e formato em todos os campos de texto, valores e datas, para impedir abuso.
 - `delete_my_account()` apaga a conta e, em cascata, todos os dados.
@@ -35,6 +37,8 @@
 - um convite não pode ser usado duas vezes;
 - quem está fora do grupo não vê o grupo nem o placar;
 - o papel `anon` não acessa nada.
+
+`supabase/tests/02_grupo_test.sql` confirma a privacidade do check-in, que convite usado ou falso é recusado e que quem sai do grupo perde as listas partilhadas.
 
 ## Conferir antes de usar com outras pessoas
 

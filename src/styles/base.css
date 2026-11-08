@@ -155,3 +155,14 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .wordchips span { padding: 4px 12px; border-radius: var(--r-full); background: var(--bg-surface); font-family: var(--font-serif); font-size: 18px; }
 .step-no { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); width: 28px; flex: none; }
 .ritual-num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-size: 13px; font-weight: 500; flex: none; }
+
+/* finanças */
+.blobs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.blob { width: 100%; max-width: 150px; align-self: center; aspect-ratio: 1; }
+@media (max-width: 600px) {
+  .blobs { gap: 6px; }
+  .blob-card { padding: 12px 10px; }
+  .blob-card .caption { font-size: 11px; line-height: 15px; }
+}
+.seg.small button { height: 30px; padding: 0 10px; font-size: 13px; }
+.blob { max-width: 120px; }

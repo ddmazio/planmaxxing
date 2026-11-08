@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { insert, remove, update } from '../lib/db'
+import { DEMO, insert, insertPlain, remove, removeWhere, update } from '../lib/db'
+import { useAuth } from '../lib/auth'
+import { usePeople } from './Grupo'
 import { useRows } from '../lib/hooks'
 import { todayYmd } from '../lib/dates'
 import { SMART, type SmartKey } from '../lib/tasks'
-import type { Area, List, Task } from '../lib/types'
+import type { Area, List, ListMember, Task } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
-import { Empty, Sheet } from '../components/ui'
+import { Empty, Sheet, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { TaskDetail } from './TaskDetail'
 
@@ -34,6 +36,9 @@ function Lists({ tasks, lists, active }: { tasks: Task[]; lists: List[]; active:
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const nav = useNavigate()
+  const { session } = useAuth()
+  const { rows: members } = useRows<ListMember>('list_members', undefined, !DEMO)
+  const shared = (l: List) => (session && l.owner_id && l.owner_id !== session.user.id) || members.some((m) => m.list_id === l.id)
   const open = tasks.filter((t) => !t.completed_at)
   const count = (k: string) => (k in SMART ? open.filter(SMART[k as SmartKey].filter).length : open.filter((t) => t.list_id === k).length)
   const Row = ({ to, icon, color, label }: { to: string; icon: string; color: string; label: string }) => (
@@ -50,7 +55,7 @@ function Lists({ tasks, lists, active }: { tasks: Task[]; lists: List[]; active:
       </nav>
       <span className="mono muted">Minhas listas</span>
       <nav className="card" style={{ padding: 6 }} aria-label="Minhas listas">
-        {lists.map((l) => <Row key={l.id} to={l.id} icon="list" color="neutro" label={l.name} />)}
+        {lists.map((l) => <Row key={l.id} to={l.id} icon={shared(l) ? 'users' : 'list'} color="neutro" label={l.name} />)}
         {creating ? (
           <form className="row" style={{ padding: '6px 12px' }} onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) return; const l = await insert<List>('lists', { name: name.trim(), icon: 'list', position: lists.length + 1 }); setName(''); setCreating(false); nav(`/tarefas/${l.id}`) }}>
             <input className="input" autoFocus maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da lista" aria-label="Nome da nova lista" />
@@ -69,6 +74,11 @@ function ListView({ k, tasks, lists, areas, desktop }: { k: string; tasks: Task[
   const [title, setTitle] = useState('')
   const [showDone, setShowDone] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const { session } = useAuth()
+  const me = session?.user.id
+  const { people } = usePeople()
+  const { rows: members } = useRows<ListMember>('list_members', { eq: { list_id: k } }, !DEMO && !(k in SMART))
   const smart = k in SMART ? SMART[k as SmartKey] : null
   const list = lists.find((l) => l.id === k)
   if (!smart && !list) return <Empty>Lista não encontrada.</Empty>
@@ -94,13 +104,38 @@ function ListView({ k, tasks, lists, areas, desktop }: { k: string; tasks: Task[
             </form>
           ) : <h1 className="serif" style={{ fontSize: 40, lineHeight: '44px', margin: 0 }} onDoubleClick={() => setRenaming(true)}>{smart?.name ?? list!.name}</h1>}
         </div>
-        {list && (
+        {list && !DEMO && list.owner_id && list.owner_id !== me && (
+          <button className="btn ghost small" onClick={async () => { if (confirm('Sair desta lista partilhada?')) { await removeWhere('list_members', { list_id: list.id, user_id: me! }); nav('/tarefas') } }}>Sair da lista</button>
+        )}
+        {list && (DEMO || !list.owner_id || list.owner_id === me) && (
           <div className="row" style={{ gap: 6 }}>
+            {!DEMO && <button className="icon-btn" aria-label="Partilhar lista" onClick={() => setSharing(true)} style={members.length ? { background: 'var(--ink)', color: 'var(--on-ink)' } : undefined}><Icon name="users" size={18} /></button>}
             <button className="icon-btn" aria-label="Renomear lista" onClick={() => setRenaming(true)}><Icon name="note" size={18} /></button>
             <button className="icon-btn" aria-label="Apagar lista" onClick={async () => { if (confirm(`Apagar a lista “${list.name}” e as tarefas dela?`)) { await remove('lists', list.id); nav('/tarefas') } }}><Icon name="trash" size={18} /></button>
           </div>
         )}
       </div>
+      {list && !DEMO && (list.owner_id !== me || members.length > 0) && (
+        <div className="banner row"><Icon name="users" size={16} /><span>
+          {list.owner_id !== me ? `Lista partilhada por ${people.find((p) => p.id === list.owner_id)?.display_name ?? 'alguém do grupo'}.` : `Partilhada com ${members.map((m) => people.find((p) => p.id === m.user_id)?.display_name ?? 'alguém').join(', ')}.`}
+        </span></div>
+      )}
+      {list && sharing && (
+        <Sheet open onClose={() => setSharing(false)} title="Partilhar lista" labelledBy="share-sheet">
+          <p className="muted" style={{ margin: 0 }}>Quem você escolher vê e edita as tarefas desta lista. Só aparece quem está num grupo com você.</p>
+          {people.filter((p) => p.id !== me).length ? (
+            <div className="card flush list" style={{ background: 'var(--bg-canvas)' }}>
+              {people.filter((p) => p.id !== me).map((p) => {
+                const on = members.some((m) => m.user_id === p.id)
+                return (
+                  <div key={p.id} className="list-row"><span className="grow">{p.display_name || 'Sem nome'}</span>
+                    <Toggle label={`Partilhar com ${p.display_name}`} on={on} onChange={(v) => (v ? insertPlain('list_members', { list_id: list.id, user_id: p.id }) : removeWhere('list_members', { list_id: list.id, user_id: p.id }))} /></div>
+                )
+              })}
+            </div>
+          ) : <Empty>Ninguém ainda. Crie um grupo e convide alguém em <Link className="link" to="/grupo">Grupo</Link>.</Empty>}
+        </Sheet>
+      )}
       <form className="card row" style={{ padding: '6px 16px', boxShadow: 'inset 0 0 0 1.5px var(--ink)' }} onSubmit={(e) => { e.preventDefault(); add() }}>
         <Icon name="plus" />
         <input className="input bare grow" style={{ height: 44 }} value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} placeholder="Adicionar uma tarefa" aria-label="Nova tarefa" />

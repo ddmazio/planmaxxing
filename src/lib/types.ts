@@ -41,12 +41,25 @@ export interface HabitLog extends Owned { habit_id: string; day: string }
 
 export interface Expense extends Owned {
   item: string; amount_cents: number; category: 'needs' | 'wants' | 'savings'; recurring: boolean; spent_on: string
-  original_amount_cents?: number | null; original_currency?: string | null; notes?: string | null
+  original_amount_cents?: number | null; original_currency?: string | null; fx_rate?: number | null; notes?: string | null
+  pot_id?: string | null
 }
+export interface Income extends Owned {
+  item: string; amount_cents: number; recurring: boolean; received_on: string
+  original_amount_cents?: number | null; original_currency?: string | null; fx_rate?: number | null
+}
+export interface Pot extends Owned { name: string; target_cents: number; goal_id: string | null }
+export interface Subscription extends Owned { name: string; amount_cents: number; billing_day: number; last_used_on: string | null }
+export interface BudgetRule { owner_id?: string; needs_pct: number; wants_pct: number; savings_pct: number }
+export interface Group extends Base { name: string; created_by: string; checkin_weekday: number }
+export interface GroupMember { group_id: string; user_id: string; role: 'admin' | 'member'; share: 'nothing' | 'score' | 'all'; joined_at: string }
+export interface Checkin extends Owned { group_id: string; week: number; score: number | null; intention: string | null }
+export interface ListMember { list_id: string; user_id: string }
 
 export type TableName =
   | 'profiles' | 'areas' | 'lists' | 'tasks' | 'task_items' | 'events' | 'habits' | 'habit_logs'
   | 'cycles' | 'goals' | 'steps' | 'reflections' | 'expenses' | 'incomes' | 'pots' | 'subscriptions' | 'budget_rules'
+  | 'groups' | 'group_members' | 'checkins' | 'list_members'
 
 export interface Query {
   eq?: Record<string, string | number | boolean | null>

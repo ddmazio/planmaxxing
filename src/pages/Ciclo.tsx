@@ -159,7 +159,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
           : ended ? 'Ciclo terminado'
           : now === TOTAL_WEEKS ? 'Semana de revisão'
           : `Semana ${now} de ${EXEC_WEEKS}`}
-        right={<Link className="btn primary small" to="/ciclo/ritual"><Icon name="sparkle" size={16} />Ritual da semana</Link>} />
+        right={<div className="row" style={{ gap: 8 }}><Link className="btn secondary small" to="/grupo"><Icon name="users" size={16} />Grupo</Link><Link className="btn primary small" to="/ciclo/ritual"><Icon name="sparkle" size={16} />Ritual da semana</Link></div>} />
 
       <div className="weeks" aria-label={`Semana ${now} de ${TOTAL_WEEKS}`}>
         {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map((w) => (
