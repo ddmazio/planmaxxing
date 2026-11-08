@@ -22,7 +22,13 @@ export function clearToken() { try { sessionStorage.removeItem(TOKEN_KEY) } catc
 async function get<T>(token: string, path: string, params: Record<string, string>): Promise<T> {
   const r = await fetch(`${API}${path}?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${token}` } })
   if (r.status === 401) { clearToken(); throw new Error('A ligação com o Google expirou. Toque em importar de novo.') }
-  if (r.status === 403) throw new Error('O Google recusou o acesso à agenda. Confira se a Google Calendar API está ativada e se você aceitou ver a agenda.')
+  if (r.status === 403) {
+    clearToken()
+    const body = await r.text().catch(() => '')
+    if (/SERVICE_DISABLED|accessNotConfigured|has not been used/i.test(body))
+      throw new Error('Falta ativar a Google Calendar API no Google Cloud (projeto Dream Board). Depois de ativar, espere 2 minutos e tente de novo.')
+    throw new Error('O Google não deu permissão para ver a agenda. Toque em importar de novo e, na tela do Google, marque a caixa de ver suas agendas.')
+  }
   if (!r.ok) throw new Error(`Google respondeu ${r.status}`)
   return r.json() as Promise<T>
 }

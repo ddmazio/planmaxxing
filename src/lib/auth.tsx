@@ -49,12 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     supabase!.auth.getSession().then(async ({ data }) => {
+      if (data.session?.provider_token && new URLSearchParams(window.location.search).get('gcal') === '1') saveToken(data.session.provider_token)
       setSession(data.session)
       if (data.session) await loadProfile().catch(() => setProfile(null))
       setReady(true)
     })
     const { data: sub } = supabase!.auth.onAuthStateChange((_e, s) => {
-      if (s?.provider_token) saveToken(s.provider_token)
+      // só guarda a chave do Google quando ela veio do pedido de acesso à agenda
+      if (s?.provider_token && new URLSearchParams(window.location.search).get('gcal') === '1') saveToken(s.provider_token)
       setSession(s)
       if (s) loadProfile().catch(() => setProfile(null))
       else setProfile(null)
