@@ -21,7 +21,9 @@ export function Hoje() {
   const { rows: tasks } = useRows<Task>('tasks', { eq: { completed_at: null } })
   const { rows: lists } = useRows<List>('lists')
   const { rows: areas } = useRows<Area>('areas')
-  const { rows: events } = useRows<CalEvent>('events', { gte: { starts_at: toIso(today) }, lt: { starts_at: toIso(ymd(addDays(now, 1))) }, order: { column: 'starts_at' } })
+  const { rows: loadedEvents } = useRows<CalEvent>('events', { gte: { starts_at: toIso(ymd(addDays(now, -35))) }, lt: { starts_at: toIso(ymd(addDays(now, 1))) }, order: { column: 'starts_at' } })
+  // inclui os que começaram antes e continuam hoje (ex.: um evento de vários dias)
+  const events = loadedEvents.filter((e) => e.ends_at > toIso(today))
   const { rows: habits } = useRows<Habit>('habits', { eq: { archived: false } })
   const { rows: logs } = useRows<HabitLog>('habit_logs', { eq: { day: today } })
 

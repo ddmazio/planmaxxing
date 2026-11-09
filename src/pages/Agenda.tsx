@@ -32,7 +32,8 @@ export function Agenda() {
     if (view === 'semana') { const s = weekStart(date, ws); return [s, addDays(s, 7)] }
     const s = weekStart(startOfMonth(date), ws); return [s, addDays(s, 42)]
   }, [view, date.getTime(), ws]) // eslint-disable-line react-hooks/exhaustive-deps
-  const { rows: all } = useRows<CalEvent>('events', { gte: { starts_at: range[0].toISOString() }, lt: { starts_at: range[1].toISOString() }, order: { column: 'starts_at' } })
+  const { rows: loaded } = useRows<CalEvent>('events', { gte: { starts_at: addDays(range[0], -35).toISOString() }, lt: { starts_at: range[1].toISOString() }, order: { column: 'starts_at' } })
+  const all = loaded.filter((e) => new Date(e.ends_at) > range[0])
   const { rows: areas } = useRows<Area>('areas', { eq: { archived: false }, order: { column: 'position' } })
   const cals = useCalendars(areas)
   const events = all.filter(cals.visible)
@@ -104,6 +105,47 @@ function CalendarList({ cals }: { cals: ReturnType<typeof useCalendars> }) {
   )
 }
 
+const dayStart = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+/** Evento que cobre o dia (para os de vários dias). */
+const covers = (e: CalEvent, d: Date) => new Date(e.starts_at) < addDays(dayStart(d), 1) && new Date(e.ends_at) > dayStart(d)
+/** Vai para a faixa de cima: dia inteiro, ou com hora mas atravessando mais de 24h. */
+const isLong = (e: CalEvent) => e.all_day || new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime() >= 24 * 36e5
+
+function AllDayRow({ days, events, paint, onOpen, cols }: { days: Date[]; events: CalEvent[]; paint: Paint; onOpen: (id: string) => void; cols: string }) {
+  // cada evento vira uma barra do primeiro ao último dia visível que ele cobre, em faixas que não se sobrepõem
+  const bars = events
+    .map((e) => { const idx = days.map((d, i) => (covers(e, d) ? i : -1)).filter((i) => i >= 0); return { e, a: idx[0], b: idx[idx.length - 1] } })
+    .filter((x) => x.a !== undefined)
+    .sort((x, y) => x.a - y.a || (y.b - y.a) - (x.b - x.a))
+  const lanes: number[] = []
+  const placed = bars.map((x) => { let l = lanes.findIndex((end) => end < x.a); if (l < 0) { l = lanes.length; lanes.push(x.b) } else lanes[l] = x.b; return { ...x, lane: l } })
+  const [open, setOpen] = useState(false)
+  const maxLanes = open ? lanes.length : Math.min(lanes.length, 4)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: cols, gridAutoRows: '24px', rowGap: 2, padding: '0 0 6px' }}>
+      <div className="mono faint" style={{ fontSize: 10, paddingTop: 4, gridRow: 1, gridColumn: 1 }}>dia</div>
+      {placed.filter((x) => x.lane < maxLanes).map(({ e, a, b, lane }) => {
+        const p = paint(e)
+        const startsBefore = new Date(e.starts_at) < dayStart(days[0])
+        const endsAfter = new Date(e.ends_at) > addDays(dayStart(days[days.length - 1]), 1)
+        return (
+          <button key={e.id} onClick={() => onOpen(e.id)} className="caption" title={e.title}
+            style={{ gridColumn: `${a + 2} / ${b + 3}`, gridRow: lane + 1, margin: '0 2px', textAlign: 'left', padding: '2px 8px', background: p.bg, color: 'var(--text-primary)',
+              boxShadow: startsBefore ? undefined : `inset 3px 0 0 ${p.fg}`, borderRadius: `${startsBefore ? 0 : 6}px ${endsAfter ? 0 : 6}px ${endsAfter ? 0 : 6}px ${startsBefore ? 0 : 6}px`,
+              overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            {startsBefore && '← '}{e.title}{!e.all_day && ` · ${hhmm(e.starts_at)}`}
+          </button>
+        )
+      })}
+      {lanes.length > 4 && (
+        <button className="caption muted" style={{ gridColumn: '2 / -1', gridRow: maxLanes + 1, textAlign: 'left', padding: '0 6px' }} onClick={() => setOpen(!open)}>
+          {open ? 'mostrar menos' : `+ ${placed.filter((x) => x.lane >= 4).length} eventos de dia inteiro`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events: CalEvent[]; paint: Paint; onOpen: (id: string) => void; onNew: (d: Date) => void }) {
   const now = new Date()
   const scroller = useRef<HTMLDivElement>(null)
@@ -133,20 +175,12 @@ function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events
             <span className="medium" style={isSameDay(d, now) ? { background: 'var(--ink)', color: 'var(--on-ink)', borderRadius: '50%', width: 28, height: 28, display: 'grid', placeItems: 'center' } : { height: 28, display: 'grid', placeItems: 'center' }}>{fmt(d, 'd')}</span>
           </button>
         ))}
-        <div className="mono faint" style={{ fontSize: 10, paddingTop: 2 }}>dia</div>
-        {days.map((d) => (
-          <div key={'ad' + d.toISOString()} className="stack" style={{ gap: 2, padding: '0 2px 6px', maxHeight: 112, overflowY: 'auto' }}>
-            {events.filter((e) => e.all_day && isSameDay(new Date(e.starts_at), d)).map((e) => {
-              const p = paint(e)
-              return <button key={e.id} onClick={() => onOpen(e.id)} className="caption" title={e.title} style={{ textAlign: 'left', borderRadius: 6, padding: '2px 6px', background: p.bg, color: 'var(--text-primary)', boxShadow: `inset 3px 0 0 ${p.fg}`, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', flex: 'none' }}>{e.title}</button>
-            })}
-          </div>
-        ))}
       </div>
+      <AllDayRow days={days} events={events.filter(isLong)} paint={paint} onOpen={onOpen} cols={cols} />
       <div ref={scroller} style={{ display: 'grid', gridTemplateColumns: cols, height, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
         <div>{HOURS.map((h) => <div key={h} className="cal-hour">{String(h).padStart(2, '0')}</div>)}</div>
         {days.map((d) => {
-          const timed = events.filter((e) => !e.all_day && isSameDay(new Date(e.starts_at), d))
+          const timed = events.filter((e) => !isLong(e) && isSameDay(new Date(e.starts_at), d))
           const lay = layoutDay(timed)
           return (
             <div key={'c' + d.toISOString()} style={{ position: 'relative', borderLeft: '1px solid var(--border)' }}>
@@ -185,7 +219,7 @@ function Month({ date, ws, events, paint, onPick }: { date: Date; ws: number; ev
       <div className="month">{wkNames.map((n) => <span key={n} className="mono muted" style={{ textAlign: 'center' }}>{n}</span>)}</div>
       <div className="month">
         {days.map((d) => {
-          const evs = events.filter((e) => isSameDay(new Date(e.starts_at), d))
+          const evs = events.filter((e) => (isLong(e) ? covers(e, d) : isSameDay(new Date(e.starts_at), d)))
           const out = d.getMonth() !== date.getMonth() || d > end
           return (
             <button key={d.toISOString()} className={'day' + (out ? ' out' : '') + (isSameDay(d, new Date()) ? ' today' : '')} onClick={() => onPick(d)} aria-label={`${fmt(d, "d 'de' MMMM")}, ${evs.length} eventos`}>
