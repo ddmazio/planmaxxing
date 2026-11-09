@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { addMonths, endOfMonth, startOfMonth } from 'date-fns'
 import { insert, remove, update } from '../lib/db'
@@ -107,7 +107,21 @@ function CalendarList({ cals }: { cals: ReturnType<typeof useCalendars> }) {
 function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events: CalEvent[]; paint: Paint; onOpen: (id: string) => void; onNew: (d: Date) => void }) {
   const now = new Date()
   const scroller = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState(480)
   useEffect(() => { if (scroller.current) scroller.current.scrollTop = 7 * HOUR_PX - 8 }, [])
+  // a grade ocupa até o fim da janela (no celular, desconta a barra de baixo)
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = scroller.current
+      if (!el) return
+      const bottomGap = window.matchMedia('(min-width: 1024px)').matches ? 28 : 112
+      setHeight(Math.max(320, Math.round(window.innerHeight - el.getBoundingClientRect().top - bottomGap)))
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    const ro = new ResizeObserver(fit); if (scroller.current?.parentElement) ro.observe(scroller.current.parentElement)
+    return () => { window.removeEventListener('resize', fit); ro.disconnect() }
+  }, [])
   const cols = `36px repeat(${days.length}, minmax(0, 1fr))`
   return (
     <div className="card" style={{ padding: 12 }}>
@@ -129,7 +143,7 @@ function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events
           </div>
         ))}
       </div>
-      <div ref={scroller} style={{ display: 'grid', gridTemplateColumns: cols, maxHeight: 'max(420px, calc(100vh - 300px))', overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+      <div ref={scroller} style={{ display: 'grid', gridTemplateColumns: cols, height, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
         <div>{HOURS.map((h) => <div key={h} className="cal-hour">{String(h).padStart(2, '0')}</div>)}</div>
         {days.map((d) => {
           const timed = events.filter((e) => !e.all_day && isSameDay(new Date(e.starts_at), d))
