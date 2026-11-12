@@ -17,6 +17,7 @@ import { Agenda } from './pages/Agenda'
 import { Config, applyTheme, savedTheme } from './pages/Config'
 import { Financas } from './pages/Financas'
 import { AceitarConvite, Grupo } from './pages/Grupo'
+import { Privacidade } from './pages/Privacidade'
 import { AreaPage, Ciclo, Ritual } from './pages/Ciclo'
 import { DEMO } from './lib/db'
 
@@ -35,6 +36,7 @@ function ConviteRoute() {
 function Gate() {
   const { ready, session, demo, profile } = useAuth()
   const loc = useLocation()
+  if (loc.pathname === '/privacidade') return <Privacidade />
   if (!ready) return <div style={{ display: 'grid', placeItems: 'center', height: '100%' }} className="muted">Carregando…</div>
   const signedIn = DEMO ? demo : !!session
   if (!signedIn) return <Login />
