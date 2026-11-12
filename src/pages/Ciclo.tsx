@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { insert, remove, update } from '../lib/db'
+import { insert, remove, removeWhere, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { fmt, fromYmd, todayYmd, weekStart, ymd } from '../lib/dates'
@@ -147,6 +147,14 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
   const areaOf = (id: string | null) => areas.find((a) => a.id === id)
   const reviewedNow = reflections.some((r) => r.kind === 'review' && r.week === now)
 
+  const [deleting, setDeleting] = useState(false)
+  async function destroy() {
+    // reflexões ficariam soltas (o banco só desliga o ciclo delas), então saem primeiro; metas e passos saem junto com o ciclo
+    await removeWhere('reflections', { cycle_id: cycle.id })
+    await remove('cycles', cycle.id)
+    setDeleting(false)
+  }
+
   async function close() {
     if (!confirm('Encerrar este ciclo? Ele fica guardado e você pode começar outro.')) return
     await update<Cycle>('cycles', cycle.id, { status: 'closed' })
@@ -237,11 +245,22 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
             </div>
           ) : <Empty>Cada ritual semanal fica guardado aqui.</Empty>}
 
-          {!ended && <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={close}>Encerrar ciclo antes do fim</button>}
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {!ended && <button className="btn ghost small" onClick={close}>Encerrar ciclo antes do fim</button>}
+            <button className="btn ghost small" style={{ color: 'var(--danger)' }} onClick={() => setDeleting(true)}><Icon name="trash" size={14} />Apagar ciclo e recomeçar</button>
+          </div>
         </div>
       </div>
 
       <GoalSheet open={newGoal} onClose={() => setNewGoal(false)} cycle={cycle} areas={areas} position={goals.length} />
+      <Sheet open={deleting} onClose={() => setDeleting(false)} title="Apagar ciclo" labelledBy="del-cycle">
+        <p style={{ margin: 0 }}>Apagar <b>{cycle.name}</b> com {goals.length} meta{goals.length === 1 ? '' : 's'}, {steps.length} passo{steps.length === 1 ? '' : 's'} e {reflections.length} reflex{reflections.length === 1 ? 'ão' : 'ões'}?</p>
+        <p className="caption muted" style={{ margin: 0 }}>Não há volta. Suas áreas, tarefas, agenda e finanças não mudam. Se quiser guardar o histórico, use “Encerrar ciclo” em vez de apagar.</p>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn secondary grow" onClick={() => setDeleting(false)}>Cancelar</button>
+          <button className="btn danger grow" onClick={destroy}>Apagar e recomeçar</button>
+        </div>
+      </Sheet>
       <VisionSheet open={editVision} onClose={() => setEditVision(false)} cycle={cycle} />
     </div>
   )

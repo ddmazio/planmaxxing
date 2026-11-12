@@ -98,6 +98,12 @@ export async function remove(table: TableName, id: string): Promise<void> {
     await localSave(table, (await localAll(table)).filter((r) => r.id !== id))
     if (table === 'tasks') await localSave('task_items', (await localAll('task_items')).filter((r) => r.task_id !== id))
     if (table === 'lists') await localSave('tasks', (await localAll('tasks')).filter((r) => r.list_id !== id))
+    if (table === 'cycles') {
+      const goals = (await localAll('goals')).filter((r) => r.cycle_id === id).map((r) => r.id)
+      await localSave('goals', (await localAll('goals')).filter((r) => r.cycle_id !== id))
+      await localSave('steps', (await localAll('steps')).filter((r) => !goals.includes(r.goal_id as string)))
+      notify('goals'); notify('steps')
+    }
     notify(table)
     return
   }
