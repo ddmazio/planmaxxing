@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { DEMO, exportAll, insert, syncExternalEvents, update } from '../lib/db'
+import { DEMO, callFunction, exportAll, insert, removeWhere, syncExternalEvents, touch, update } from '../lib/db'
 import { useRows } from '../lib/hooks'
 import { CURRENCIES } from '../lib/money'
 import { fetchEvents, getToken, listCalendars, syncCalendars } from '../lib/gcal'
 import { fmt } from '../lib/dates'
-import type { Area, AreaColor } from '../lib/types'
+import type { Area, AreaColor, Integration } from '../lib/types'
+import { formatDistanceToNow } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader } from '../components/Shell'
@@ -64,7 +66,7 @@ export function Config() {
         </section>
 
         <section className="stack">
-          <GoogleAgenda />
+          <Connections />
 
           <span className="mono muted">Pessoas</span>
           <div className="card flush list">
@@ -195,19 +197,119 @@ function GoogleAgenda() {
   }, [sp, session])
 
   return (
+    <div className="stack" style={{ gap: 6 }}>
+      <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} disabled={state.busy || DEMO} onClick={run}>{state.busy ? 'Importando…' : 'Importar agora, sem ligar'}</button>
+      {state.msg && <span className="caption" style={{ color: state.err ? 'var(--danger)' : undefined }}>{state.msg}</span>}
+      {last && !state.msg && <span className="caption muted">Última importação manual: {fmt(new Date(last), "d 'de' MMM 'às' HH:mm")}</span>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- ligações automáticas (servidor)
+const COLS = 'owner_id,provider,account_email,status,last_sync_at,last_error,created_at'
+const SERVICES = {
+  google: {
+    title: 'Google Agenda', icon: 'calendar',
+    desc: 'Atualiza sozinho a cada 15 minutos, mesmo com o app fechado: eventos novos, mudados e apagados. Só leitura, nada muda no Google. Na Agenda você escolhe quais agendas mostrar.',
+  },
+  microsoft: {
+    title: 'Microsoft To Do', icon: 'check',
+    desc: 'Nos dois sentidos: o que você cria, conclui, edita ou apaga aqui chega ao To Do em segundos, e o que muda lá aparece aqui em até 2 minutos. A lista “Tarefas” do To Do é a Inbox do app. As etapas dentro de uma tarefa ainda não sincronizam.',
+  },
+} as const
+
+function Connections() {
+  const { session } = useAuth()
+  const { rows, error } = useRows<Integration>('integrations', { columns: COLS }, !DEMO)
+  const [sp, setSp] = useSearchParams()
+  const [notice, setNotice] = useState<{ msg: string; err: boolean } | null>(null)
+
+  useEffect(() => {
+    const ok = sp.get('conectado'), bad = sp.get('conexao')
+    if (!ok && !bad) return
+    const svc = (ok ?? sp.get('servico')) as keyof typeof SERVICES | null
+    const name = svc && SERVICES[svc] ? SERVICES[svc].title : 'o serviço'
+    const motivo = sp.get('motivo') ?? ''
+    setNotice(ok ? { msg: `${name} ligado. A primeira sincronização começou e leva até 2 minutos.`, err: false }
+      : { msg: motivo === 'cancelado' ? 'Você cancelou a ligação. Nada mudou.' : motivo.includes('permiss') ? 'Faltou marcar a caixinha da agenda na tela do Google. Tente de novo.' : `Não deu para ligar ${name}${motivo ? ` (${motivo})` : ''}.`, err: true })
+    const n = new URLSearchParams(sp); ['conectado', 'conexao', 'servico', 'motivo', 'code'].forEach((k) => n.delete(k)); setSp(n, { replace: true })
+  }, [sp, setSp])
+
+  // enquanto a primeira sincronização não acaba, confere a cada 10 s
+  const pending = rows.some((r) => !r.last_sync_at)
+  useEffect(() => {
+    if (!pending) return
+    const t = setInterval(() => { touch('integrations'); touch('tasks'); touch('lists'); touch('events'); touch('calendars') }, 10000)
+    return () => clearInterval(t)
+  }, [pending])
+
+  const missing = !!error && /integrations|schema cache|does not exist/i.test(String(error))
+  return (
     <>
-      <span className="mono muted">Google Agenda</span>
-      <div className="card stack" style={{ gap: 10 }}>
-        <div className="row"><Icon name="calendar" /><span className="grow medium">Trazer meus eventos do Google</span></div>
-        <p className="caption muted" style={{ margin: 0 }}>
-          Copia para a sua Agenda os eventos de 1 mês atrás até 12 meses à frente, de todas as suas agendas do Google. Na Agenda do app você escolhe quais mostrar. O app só lê: nada muda no Google. Importar de novo atualiza e não duplica.
-        </p>
-        {DEMO ? <span className="caption muted">Disponível só com a conta online.</span> : (
-          <button className="btn primary" disabled={state.busy} onClick={run}>{state.busy ? 'Importando…' : last ? 'Atualizar do Google' : 'Importar do Google Agenda'}</button>
-        )}
-        {state.msg && <span className="caption" style={{ color: state.err ? 'var(--danger)' : undefined }}>{state.msg}</span>}
-        {last && !state.msg && <span className="caption muted">Última importação: {fmt(new Date(last), "d 'de' MMM 'às' HH:mm")}</span>}
-      </div>
+      <span className="mono muted">Sincronização automática</span>
+      {notice && <div className={'banner caption'} style={notice.err ? { background: 'var(--relacoes-bg)', color: 'var(--relacoes-fg)' } : undefined}>{notice.msg}</div>}
+      {DEMO ? <div className="card caption muted">Disponível só com a conta online.</div>
+        : missing ? <div className="card caption" style={{ color: 'var(--danger)' }}>Falta rodar no Supabase o arquivo 20261112000000_sincronizacao.sql.</div>
+        : (['google', 'microsoft'] as const).map((p) => <ServiceCard key={p} provider={p} row={rows.find((r) => r.provider === p)} me={session?.user.id ?? ''} />)}
     </>
+  )
+}
+
+function ServiceCard({ provider, row, me }: { provider: 'google' | 'microsoft'; row?: Integration; me: string }) {
+  const svc = SERVICES[provider]
+  const [busy, setBusy] = useState<'' | 'connect' | 'sync' | 'off'>('')
+  const [msg, setMsg] = useState('')
+  const ago = (iso: string) => formatDistanceToNow(new Date(iso), { addSuffix: true, locale: ptBR })
+
+  async function connect() {
+    setBusy('connect'); setMsg('')
+    try { const { url } = await callFunction<{ url: string }>('connect', { provider }); location.assign(url) }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); setBusy('') }
+  }
+  async function syncNow() {
+    setBusy('sync'); setMsg('')
+    try {
+      const r = await callFunction<{ report?: { error?: string; saved?: number; received?: number; sent?: number }[] }>('sync', { provider })
+      const x = r.report?.[0]
+      setMsg(x?.error ? x.error : provider === 'google' ? `Pronto: ${x?.saved ?? 0} eventos conferidos.` : `Pronto: ${x?.sent ?? 0} enviadas, ${x?.received ?? 0} recebidas.`)
+      ;['integrations', 'events', 'calendars', 'tasks', 'lists'].forEach((t) => touch(t as never))
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)) }
+    setBusy('')
+  }
+  async function off() {
+    const extra = provider === 'microsoft' ? ' Suas listas e tarefas ficam no app e no To Do, só deixam de se atualizar uma à outra.' : ' Os eventos já importados ficam no app.'
+    if (!confirm(`Desligar ${svc.title}?${extra} A chave guardada é apagada.`)) return
+    setBusy('off')
+    try { await removeWhere('integrations', { owner_id: me, provider }) } catch (e) { setMsg(e instanceof Error ? e.message : String(e)) }
+    setBusy('')
+  }
+
+  return (
+    <div className="card stack" style={{ gap: 10 }}>
+      <div className="row">
+        <Icon name={svc.icon} />
+        <span className="grow medium">{svc.title}</span>
+        {row && <span className="pill caption" style={{ background: row.status === 'error' ? 'var(--relacoes-bg)' : 'var(--saude-bg)', color: row.status === 'error' ? 'var(--relacoes-fg)' : 'var(--saude-fg)' }}>{row.status === 'error' ? 'com erro' : 'ligado'}</span>}
+      </div>
+      <p className="caption muted" style={{ margin: 0 }}>{svc.desc}</p>
+      {row ? (
+        <>
+          <span className="caption">
+            {row.account_email && <>Conta: {row.account_email}<br /></>}
+            {row.last_sync_at ? `Última sincronização ${ago(row.last_sync_at)}.` : 'Primeira sincronização em andamento…'}
+          </span>
+          {row.status === 'error' && row.last_error && <span className="caption" style={{ color: 'var(--danger)' }}>{row.last_error}</span>}
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn secondary small" disabled={!!busy} onClick={syncNow}>{busy === 'sync' ? 'Sincronizando…' : 'Sincronizar agora'}</button>
+            {row.status === 'error' && <button className="btn secondary small" disabled={!!busy} onClick={connect}>Ligar de novo</button>}
+            <button className="btn ghost small" disabled={!!busy} onClick={off}>Desligar</button>
+          </div>
+        </>
+      ) : (
+        <button className="btn primary" disabled={!!busy} onClick={connect}>{busy === 'connect' ? 'Abrindo…' : `Ligar ${svc.title}`}</button>
+      )}
+      {msg && <span className="caption">{msg}</span>}
+      {provider === 'google' && !row && <GoogleAgenda />}
+    </div>
   )
 }

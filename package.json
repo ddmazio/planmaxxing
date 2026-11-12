@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "functions:bundle": "node scripts/bundle-functions.mjs"
   },
   "dependencies": {
     "@fontsource/geist": "^5.3.0",
@@ -26,6 +27,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
+    "esbuild": "^0.25.12",
     "typescript": "^5.9.3",
     "vite": "^8.3.6",
     "vite-plugin-pwa": "^2.0.0",

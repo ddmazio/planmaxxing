@@ -7,7 +7,8 @@ import type { Task } from './types'
 export async function toggleTask(t: Task) {
   if (t.completed_at) { await update<Task>('tasks', t.id, { completed_at: null }); return }
   await update<Task>('tasks', t.id, { completed_at: new Date().toISOString() })
-  if (t.repeat_rule) {
+  // tarefas ligadas ao Microsoft To Do: quem cria a próxima repetição é o To Do (chega pela sincronização)
+  if (t.repeat_rule && !t.external_id?.startsWith('ms:')) {
     const base = t.due_on ? fromYmd(t.due_on) : new Date()
     let next = base
     switch (t.repeat_rule) {

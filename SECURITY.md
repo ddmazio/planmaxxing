@@ -12,7 +12,9 @@
 - **Finanças nunca são partilhadas**: as tabelas de renda, gastos, potes, assinaturas e regra não têm nenhuma política de grupo.
 - No check-in do grupo, cada pessoa escolhe o que mostrar (nada, só o placar, ou tudo). Ninguém lê a tabela de check-ins dos outros: o grupo só vê pela função `group_scores`, que respeita essa escolha.
 - Ao sair de um grupo, a pessoa perde o acesso às listas partilhadas por quem estava nele.
-- Google Agenda: o app pede só permissão de **leitura** (`calendar.readonly`). O token do Google fica só na aba aberta (sessionStorage), vale 1 hora e não vai para o banco. Os eventos importados ficam protegidos pelas mesmas regras de dono.
+- **Sincronização automática (Google Agenda e Microsoft To Do)**: as chaves permanentes ficam no **Vault** do Supabase, criptografadas. O app nunca recebe a chave: ele só lê se a ligação está ativa, a última sincronização e o erro (permissão por coluna), e pode desligar, o que apaga a chave. Só as funções do servidor (`connect` e `sync`, com a chave de serviço) leem o Vault. A ligação passa por um `state` assinado (HMAC) que expira em 10 minutos. O agendamento chama a função com uma senha interna guardada no Vault.
+- Google: só leitura (`calendar.readonly`). Microsoft: `Tasks.ReadWrite` (tarefas) e `User.Read` (o e-mail da conta). Nada além disso.
+- Google Agenda (importação manual): o app pede só permissão de **leitura** (`calendar.readonly`). O token do Google fica só na aba aberta (sessionStorage), vale 1 hora e não vai para o banco. Os eventos importados ficam protegidos pelas mesmas regras de dono.
 - O câmbio de moedas é digitado por você: o app não chama nenhum serviço de terceiros.
 - Colegas de grupo só veem o seu nome (`group_profiles`). E-mail, data de nascimento e fuso não saem do seu perfil.
 - Limites de tamanho e formato em todos os campos de texto, valores e datas, para impedir abuso.
@@ -38,6 +40,8 @@
 - um convite não pode ser usado duas vezes;
 - quem está fora do grupo não vê o grupo nem o placar;
 - o papel `anon` não acessa nada.
+
+`supabase/functions/_shared/core.integration.test.ts` testa a sincronização de ponta a ponta (Postgres + PostgREST locais, Google e To Do simulados): sem duplicar, sem eco, nos dois sentidos.
 
 `supabase/tests/02_grupo_test.sql` confirma a privacidade do check-in, que convite usado ou falso é recusado e que quem sai do grupo perde as listas partilhadas.
 

@@ -27,6 +27,7 @@ export interface Task extends Owned {
   due_on: string | null; due_time: string | null; remind_at: string | null
   repeat_rule: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'weekdays' | null
   area_id: string | null; step_id: string | null; completed_at: string | null; position: number
+  external_id?: string | null
 }
 
 export interface TaskItem extends Base { task_id: string; title: string; done: boolean; position: number }
@@ -60,9 +61,10 @@ export interface ListMember { list_id: string; user_id: string }
 export type TableName =
   | 'profiles' | 'areas' | 'lists' | 'tasks' | 'task_items' | 'events' | 'habits' | 'habit_logs'
   | 'cycles' | 'goals' | 'steps' | 'reflections' | 'expenses' | 'incomes' | 'pots' | 'subscriptions' | 'budget_rules'
-  | 'groups' | 'group_members' | 'checkins' | 'list_members' | 'calendars'
+  | 'groups' | 'group_members' | 'checkins' | 'list_members' | 'calendars' | 'integrations'
 
 export interface Query {
+  columns?: string
   eq?: Record<string, string | number | boolean | null>
   gte?: Record<string, string | number>
   lt?: Record<string, string | number>
@@ -86,3 +88,5 @@ export interface Reflection extends Owned {
 }
 
 export interface Calendar extends Owned { external_id: string; name: string; color: string | null; visible: boolean; position: number }
+
+export interface Integration { owner_id: string; provider: 'google' | 'microsoft'; account_email: string | null; status: 'active' | 'error'; last_sync_at: string | null; last_error: string | null; created_at: string }

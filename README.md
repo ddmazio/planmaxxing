@@ -48,3 +48,12 @@ npm run build      # gera /dist
 Para instalar: no iPhone, abra no Safari → Compartilhar → "Adicionar à Tela de Início". No Android e no Chrome do Mac, "Instalar app".
 
 Veja `SECURITY.md` para o que protege os dados e a lista de conferência antes de usar com outras pessoas.
+
+## Sincronização automática (Google Agenda e Microsoft To Do)
+
+Duas Edge Functions (`supabase/functions/connect` e `supabase/functions/sync`). Para publicar pelo painel, rode `npm run functions:bundle` e cole `supabase/functions-dist/<nome>.ts` em **Edge Functions → Deploy a new function → Via editor**, com **Verify JWT desligado** (a função confere o login ela mesma).
+
+Segredos das funções (**Edge Functions → Secrets**): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`.
+
+- Google Cloud: no cliente OAuth, adicione o redirect `https://SEU-PROJETO.supabase.co/functions/v1/connect` e publique o app (fora de "Testando", senão a chave vence em 7 dias).
+- Microsoft (portal Azure → App registrations): contas pessoais e de organização, plataforma Web com o mesmo redirect, permissões `Tasks.ReadWrite`, `User.Read`, `offline_access`, e um client secret.

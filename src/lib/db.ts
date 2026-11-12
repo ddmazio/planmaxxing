@@ -55,14 +55,20 @@ const uuid = () => crypto.randomUUID()
 // ---------------------------------------------------------------- API única
 export async function select<T>(table: TableName, q?: Query): Promise<T[]> {
   if (DEMO) return sortRows((await localAll(table)).filter((r) => match(r, q)), q) as unknown as T[]
-  let req = supabase!.from(table).select('*')
-  for (const [k, v] of Object.entries(q?.eq ?? {})) req = v === null ? req.is(k, null) : req.eq(k, v)
-  for (const [k, v] of Object.entries(q?.gte ?? {})) req = req.gte(k, v)
-  for (const [k, v] of Object.entries(q?.lt ?? {})) req = req.lt(k, v)
-  if (q?.order) req = req.order(q.order.column, { ascending: q.order.ascending ?? true })
-  const { data, error } = await req.limit(2000)
-  if (error) throw error
-  return data as T[]
+  // lê em páginas de 1000 (o servidor devolve no máximo 1000 por vez), até 20 000 linhas
+  const out: T[] = []
+  for (let from = 0; from < 20000; from += 1000) {
+    let req = supabase!.from(table).select(q?.columns ?? '*')
+    for (const [k, v] of Object.entries(q?.eq ?? {})) req = v === null ? req.is(k, null) : req.eq(k, v)
+    for (const [k, v] of Object.entries(q?.gte ?? {})) req = req.gte(k, v)
+    for (const [k, v] of Object.entries(q?.lt ?? {})) req = req.lt(k, v)
+    if (q?.order) req = req.order(q.order.column, { ascending: q.order.ascending ?? true })
+    const { data, error } = await req.range(from, from + 999)
+    if (error) throw error
+    out.push(...(data as T[]))
+    if ((data as T[]).length < 1000) break
+  }
+  return out
 }
 
 export async function insert<T>(table: TableName, values: Partial<T>): Promise<T> {
@@ -206,4 +212,16 @@ export async function syncExternalEvents(rows: Record<string, unknown>[], prefix
   }
   notify('events')
   return { saved: rows.length, removed: stale.length }
+}
+
+/** Chama uma função do servidor (Edge Function) com o login atual. */
+export async function callFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  if (DEMO) throw new Error('Disponível só com a conta online.')
+  const { data, error } = await supabase!.functions.invoke(name, { body })
+  if (error) {
+    let msg = error.message
+    try { const j = await (error as { context?: Response }).context?.json(); if (j?.error) msg = j.error } catch { /* */ }
+    throw new Error(msg)
+  }
+  return data as T
 }
