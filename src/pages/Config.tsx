@@ -206,6 +206,8 @@ function GoogleAgenda() {
 }
 
 // ---------------------------------------------------------------- ligações automáticas (servidor)
+// Microsoft To Do fica pronto no servidor, mas escondido até haver um registro de app na Microsoft
+const ACTIVE_SERVICES = ['google'] as const
 const COLS = 'owner_id,provider,account_email,status,last_sync_at,last_error,created_at'
 const SERVICES = {
   google: {
@@ -250,7 +252,7 @@ function Connections() {
       {notice && <div className={'banner caption'} style={notice.err ? { background: 'var(--relacoes-bg)', color: 'var(--relacoes-fg)' } : undefined}>{notice.msg}</div>}
       {DEMO ? <div className="card caption muted">Disponível só com a conta online.</div>
         : missing ? <div className="card caption" style={{ color: 'var(--danger)' }}>Falta rodar no Supabase o arquivo 20261112000000_sincronizacao.sql.</div>
-        : (['google', 'microsoft'] as const).map((p) => <ServiceCard key={p} provider={p} row={rows.find((r) => r.provider === p)} me={session?.user.id ?? ''} />)}
+        : (ACTIVE_SERVICES).map((p) => <ServiceCard key={p} provider={p} row={rows.find((r) => r.provider === p)} me={session?.user.id ?? ''} />)}
     </>
   )
 }
