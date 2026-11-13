@@ -23,6 +23,12 @@ import { DEMO } from './lib/db'
 
 applyTheme(savedTheme())
 
+// quando uma versão nova do app assume, recarrega uma vez para usar os arquivos novos
+if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  let reloaded = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload() } })
+}
+
 // guarda o convite aberto antes do login, para usar depois de entrar
 const inv = location.pathname.match(/^\/convite\/([0-9a-f]{48})$/)
 if (inv) try { localStorage.setItem('pending-invite', inv[1]) } catch { /* sem armazenamento */ }

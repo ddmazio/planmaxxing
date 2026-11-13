@@ -32,6 +32,9 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/auth\//],
         runtimeCaching: [],
         cleanupOutdatedCaches: true,
+        // versão nova assume na hora (sem esperar fechar todas as janelas do app)
+        skipWaiting: true,
+        clientsClaim: true,
       },
     }),
   ],
