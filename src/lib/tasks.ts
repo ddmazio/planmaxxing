@@ -1,12 +1,14 @@
 import { addDays, addMonths, addWeeks, addYears } from 'date-fns'
 import { insert, update } from './db'
 import { fromYmd, todayYmd, ymd } from './dates'
-import type { Task } from './types'
+import type { Step, Task } from './types'
 
 /** Conclui/reabre. Se a tarefa repete, cria a próxima ocorrência ao concluir. */
 export async function toggleTask(t: Task) {
   if (t.completed_at) { await update<Task>('tasks', t.id, { completed_at: null }); return }
   await update<Task>('tasks', t.id, { completed_at: new Date().toISOString() })
+  // tarefa que virou passo de meta: concluir a tarefa conclui o passo
+  if (t.step_id) await update<Step>('steps', t.step_id, { done_at: new Date().toISOString() }).catch(() => {})
   // tarefas ligadas ao Microsoft To Do: quem cria a próxima repetição é o To Do (chega pela sincronização)
   if (t.repeat_rule && !t.external_id?.startsWith('ms:')) {
     const base = t.due_on ? fromYmd(t.due_on) : new Date()

@@ -6,7 +6,7 @@ import { addDays, fmt, fromYmd, greeting, hhmm, toIso, todayYmd, weekDays, ymd }
 import { isToday } from '../lib/tasks'
 import { EXEC_WEEKS, TOTAL_WEEKS, weekOf } from '../lib/cycle'
 import { areaExecution, cycleWeekDays, execEnd } from '../lib/execution'
-import type { CalEvent, Habit, HabitLog, List, Step, Task } from '../lib/types'
+import type { CalEvent, Habit, HabitLog, List, Step, Task, TaskItem } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
 import { AreaIcon, AreaTag, Check, Empty, SectionHead } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -36,6 +36,7 @@ export function Hoje() {
 
   const { rows: tasks } = useRows<Task>('tasks', { eq: { completed_at: null } })
   const { rows: lists } = useRows<List>('lists')
+  const { rows: items } = useRows<TaskItem>('task_items', { order: { column: 'position' } })
   const { rows: loadedEvents } = useRows<CalEvent>('events', { gte: { starts_at: toIso(ymd(addDays(now, -35))) }, lt: { starts_at: toIso(ymd(addDays(now, 1))) }, order: { column: 'starts_at' } })
   const events = loadedEvents.filter((e) => e.ends_at > toIso(today)) // inclui os de vários dias que continuam hoje
   const { rows: habits } = useRows<Habit>('habits', { eq: { archived: false } })
@@ -129,7 +130,7 @@ export function Hoje() {
         <div className="stack">
           <SectionHead title="Tarefas de hoje" action={<Link className="caption muted" to="/tarefas">listas →</Link>} />
           <div className="card flush list">
-            {todays.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} compact />)}
+            {todays.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} compact items={items.filter((i) => i.task_id === t.id)} />)}
             <button className="list-row muted" onClick={openQuick}><Icon name="plus" size={18} />Adicionar tarefa para hoje</button>
           </div>
 

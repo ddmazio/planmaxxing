@@ -1,38 +1,68 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { DEMO, insert, insertPlain, remove, removeWhere, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { usePeople } from './Grupo'
 import { useRows } from '../lib/hooks'
 import { todayYmd } from '../lib/dates'
 import { SMART, type SmartKey } from '../lib/tasks'
-import type { Area, List, ListMember, Task } from '../lib/types'
+import type { Area, Goal, List, ListMember, Step, Task, TaskItem } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
 import { Empty, Sheet, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { TaskDetail } from './TaskDetail'
 
-function useIsDesktop() { return typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches }
+function useIsDesktop() {
+  const q = '(min-width: 1024px)'
+  const [d, setD] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches)
+  useEffect(() => { const m = window.matchMedia(q); const on = () => setD(m.matches); m.addEventListener('change', on); return () => m.removeEventListener('change', on) }, [])
+  return d
+}
 
-export function Tarefas() {
-  const { key } = useParams()
+/** Dados que as linhas usam para “2 de 4 etapas” e “Passo da meta “…””. */
+function useTaskContext() {
+  const { rows: items } = useRows<TaskItem>('task_items', { order: { column: 'position' } })
+  const { rows: steps } = useRows<Step>('steps')
+  const { rows: goals } = useRows<Goal>('goals')
+  const itemsOf = (id: string) => items.filter((i) => i.task_id === id)
+  const goalOfStep = (sid: string) => goals.find((g) => g.id === steps.find((s) => s.id === sid)?.goal_id)?.title
+  return { itemsOf, goalOfStep }
+}
+
+export function Tarefas({ openId }: { openId?: string }) {
+  const { key, task: taskParam } = useParams()
+  const nav = useNavigate()
   const desktop = useIsDesktop()
   const { rows: tasks } = useRows<Task>('tasks')
   const { rows: lists } = useRows<List>('lists', { order: { column: 'position' } })
   const { rows: areas } = useRows<Area>('areas')
-  const active = key ?? (desktop ? 'planejado' : null)
+  const [q, setQ] = useState('')
+  const ctx = useTaskContext()
+  const tid = taskParam ?? openId
+  const opened = tasks.find((t) => t.id === tid)
+  // aberta por /tarefa/:id (vinda do Hoje ou da busca): mostra a lista dela
+  const fallback = opened ? (opened.step_id && !opened.list_id ? 'passos' : opened.list_id ?? 'inbox') : 'planejado'
+  const active = q.trim() ? '__busca' : key ?? (desktop ? fallback : null)
+  const close = () => nav(key ? `/tarefas/${key}` : '/tarefas')
+  const cols = desktop ? (opened ? '260px minmax(0, 1fr) 380px' : '260px minmax(0, 1fr)') : '1fr'
 
   return (
     <div className="page wide">
-      <div style={{ display: 'grid', gridTemplateColumns: desktop ? '280px 1fr' : '1fr', gap: 16, alignItems: 'start' }}>
-        {(desktop || !active) && <Lists tasks={tasks} lists={lists} active={active} />}
-        {active && <ListView k={active} tasks={tasks} lists={lists} areas={areas} desktop={desktop} />}
+      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, alignItems: 'start' }}>
+        {(desktop || !active) && <Lists tasks={tasks} lists={lists} active={active} q={q} setQ={setQ} />}
+        {active && <ListView k={active} q={q} tasks={tasks} lists={lists} areas={areas} desktop={desktop} ctx={ctx} openId={tid} onBack={() => { setQ(''); nav('/tarefas') }} />}
+        {desktop && opened && (
+          <aside className="card task-panel" aria-label="Detalhe da tarefa">
+            <TaskDetail task={opened} onClose={close} />
+          </aside>
+        )}
       </div>
+      {!desktop && <Sheet open={!!opened} onClose={close} labelledBy="task-title">{opened && <TaskDetail task={opened} onClose={close} />}</Sheet>}
     </div>
   )
 }
 
-function Lists({ tasks, lists, active }: { tasks: Task[]; lists: List[]; active: string | null }) {
+function Lists({ tasks, lists, active, q, setQ }: { tasks: Task[]; lists: List[]; active: string | null; q: string; setQ: (v: string) => void }) {
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const nav = useNavigate()
@@ -49,11 +79,14 @@ function Lists({ tasks, lists, active }: { tasks: Task[]; lists: List[]; active:
   return (
     <div className="stack">
       <h1 className="h1">Tarefas</h1>
-      <div className="banner row"><Icon name="sun" size={16} /><span>As tarefas de hoje aparecem no Hoje, junto com a agenda.</span></div>
+      <label className="search-field row"><Icon name="search" size={16} className="muted" />
+        <input className="input bare grow" placeholder="Buscar tarefas" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar tarefas" />
+        {q && <button aria-label="Limpar busca" className="faint" onClick={() => setQ('')}><Icon name="x" size={14} /></button>}
+      </label>
       <nav className="card" style={{ padding: 6 }} aria-label="Listas inteligentes">
         {(Object.keys(SMART) as SmartKey[]).map((k) => <Row key={k} to={k} icon={SMART[k].icon} color={SMART[k].color} label={SMART[k].name} />)}
       </nav>
-      <span className="mono muted">Minhas listas</span>
+      <span className="mono muted" style={{ textTransform: 'uppercase' }}>Minhas listas</span>
       <nav className="card" style={{ padding: 6 }} aria-label="Minhas listas">
         {lists.map((l) => <Row key={l.id} to={l.id} icon={shared(l) ? 'users' : 'list'} color="neutro" label={l.name} />)}
         {creating ? (
@@ -69,20 +102,34 @@ function Lists({ tasks, lists, active }: { tasks: Task[]; lists: List[]; active:
   )
 }
 
-function ListView({ k, tasks, lists, areas, desktop }: { k: string; tasks: Task[]; lists: List[]; areas: Area[]; desktop: boolean }) {
+const SUB: Record<string, string> = {
+  importante: 'Tarefas marcadas com estrela',
+  planejado: 'Tarefas com data · as mais próximas primeiro',
+  passos: 'Passos das metas que viraram tarefa',
+  inbox: 'Tarefas sem lista',
+}
+
+function ListView({ k, q, tasks, lists, areas, desktop, ctx, openId, onBack }: {
+  k: string; q: string; tasks: Task[]; lists: List[]; areas: Area[]; desktop: boolean
+  ctx: ReturnType<typeof useTaskContext>; openId?: string; onBack: () => void
+}) {
   const nav = useNavigate()
   const [title, setTitle] = useState('')
   const [showDone, setShowDone] = useState(false)
   const [renaming, setRenaming] = useState(false)
-  const [sharing, setSharing] = useState(false)
+  const [sp, setSp] = useSearchParams()
+  const [sharing, setSharingState] = useState(sp.get('partilhar') === '1')
+  const setSharing = (v: boolean) => { setSharingState(v); if (!v && sp.has('partilhar')) { const n = new URLSearchParams(sp); n.delete('partilhar'); setSp(n, { replace: true }) } }
   const { session } = useAuth()
   const me = session?.user.id
   const { people } = usePeople()
-  const { rows: members } = useRows<ListMember>('list_members', { eq: { list_id: k } }, !DEMO && !(k in SMART))
+  const { rows: members } = useRows<ListMember>('list_members', { eq: { list_id: k } }, !DEMO && lists.some((l) => l.id === k))
+  const search = k === '__busca'
   const smart = k in SMART ? SMART[k as SmartKey] : null
   const list = lists.find((l) => l.id === k)
-  if (!smart && !list) return <Empty>Lista não encontrada.</Empty>
-  const inList = tasks.filter((t) => (smart ? smart.filter(t) : t.list_id === k))
+  if (!search && !smart && !list) return <Empty>Lista não encontrada.</Empty>
+  const norm = (x: string) => x.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  const inList = tasks.filter((t) => (search ? norm(`${t.title} ${t.notes ?? ''}`).includes(norm(q.trim())) : smart ? smart.filter(t) : t.list_id === k))
   const open = inList.filter((t) => !t.completed_at).sort((a, b) => (a.due_on ?? '9') < (b.due_on ?? '9') ? -1 : 1)
   const done = inList.filter((t) => t.completed_at)
   const add = async () => {
@@ -93,16 +140,21 @@ function ListView({ k, tasks, lists, areas, desktop }: { k: string; tasks: Task[
     await insert<Task>('tasks', base); setTitle('')
   }
   return (
-    <section className="stack" aria-label={smart?.name ?? list!.name}>
-      {!desktop && <button className="btn ghost small" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onClick={() => nav('/tarefas')}><Icon name="back" size={16} />Listas</button>}
+    <section className="stack" aria-label={search ? 'Busca' : smart?.name ?? list?.name}>
+      {!desktop && <button className="btn ghost small" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onClick={onBack}><Icon name="back" size={16} />Listas</button>}
       <div className="row between">
         <div className="row">
-          <span style={{ color: `var(--${smart?.color ?? 'neutro'}-fg)` }}><Icon name={smart?.icon ?? 'list'} size={28} /></span>
+          <span style={{ color: `var(--${smart?.color ?? 'neutro'}-fg)` }}><Icon name={search ? 'search' : smart?.icon ?? 'list'} size={28} /></span>
           {renaming && list ? (
             <form onSubmit={async (e) => { e.preventDefault(); setRenaming(false) }}>
               <input className="input" autoFocus defaultValue={list.name} maxLength={60} onBlur={(e) => { if (e.target.value.trim()) update<List>('lists', list.id, { name: e.target.value.trim() }); setRenaming(false) }} aria-label="Nome da lista" />
             </form>
-          ) : <h1 className="serif" style={{ fontSize: 40, lineHeight: '44px', margin: 0 }} onDoubleClick={() => setRenaming(true)}>{smart?.name ?? list!.name}</h1>}
+          ) : (
+            <div className="stack" style={{ gap: 0 }}>
+              <h1 className="serif" style={{ fontSize: 40, lineHeight: '44px', margin: 0 }} onDoubleClick={() => setRenaming(true)}>{search ? `Busca: “${q.trim()}”` : smart?.name ?? list!.name}</h1>
+              <span className="caption muted">{search ? `${inList.length} tarefa${inList.length === 1 ? '' : 's'}` : smart ? SUB[k] : `${inList.filter((t) => !t.completed_at).length} abertas`}</span>
+            </div>
+          )}
         </div>
         {list && !DEMO && list.owner_id && list.owner_id !== me && (
           <button className="btn ghost small" onClick={async () => { if (confirm('Sair desta lista partilhada?')) { await removeWhere('list_members', { list_id: list.id, user_id: me! }); nav('/tarefas') } }}>Sair da lista</button>
@@ -136,19 +188,19 @@ function ListView({ k, tasks, lists, areas, desktop }: { k: string; tasks: Task[
           ) : <Empty>Ninguém ainda. Crie um grupo e convide alguém em <Link className="link" to="/grupo">Grupo</Link>.</Empty>}
         </Sheet>
       )}
-      <form className="card row" style={{ padding: '6px 16px', boxShadow: 'inset 0 0 0 1.5px var(--ink)' }} onSubmit={(e) => { e.preventDefault(); add() }}>
+      {!search && <form className="card row" style={{ padding: '6px 16px', boxShadow: 'inset 0 0 0 1.5px var(--ink)' }} onSubmit={(e) => { e.preventDefault(); add() }}>
         <Icon name="plus" />
         <input className="input bare grow" style={{ height: 44 }} value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} placeholder="Adicionar uma tarefa" aria-label="Nova tarefa" />
-      </form>
+      </form>}
       <div className="card flush list">
-        {open.length ? open.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} />) : <div className="list-row muted caption">Nada por aqui.</div>}
+        {open.length ? open.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} items={ctx.itemsOf(t.id)} goalOfStep={ctx.goalOfStep} href={search ? `/tarefa/${t.id}` : `/tarefas/${k}/${t.id}`} selected={t.id === openId} />) : <div className="list-row muted caption">Nada por aqui.</div>}
       </div>
       {done.length > 0 && (
         <>
           <button className="row medium" onClick={() => setShowDone(!showDone)} aria-expanded={showDone}>
             <span style={{ transform: showDone ? 'rotate(90deg)' : undefined, display: 'inline-flex' }}><Icon name="chevron" size={16} /></span>Concluídas <span className="muted">{done.length}</span>
           </button>
-          {showDone && <div className="card flush list">{done.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} />)}</div>}
+          {showDone && <div className="card flush list">{done.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} items={ctx.itemsOf(t.id)} goalOfStep={ctx.goalOfStep} href={search ? `/tarefa/${t.id}` : `/tarefas/${k}/${t.id}`} selected={t.id === openId} />)}</div>}
         </>
       )}
     </section>
@@ -157,14 +209,5 @@ function ListView({ k, tasks, lists, areas, desktop }: { k: string; tasks: Task[
 
 export function TarefaRoute() {
   const { id } = useParams()
-  const nav = useNavigate()
-  const { rows: tasks } = useRows<Task>('tasks')
-  const task = tasks.find((t) => t.id === id)
-  return (
-    <>
-      <Tarefas />
-      <Sheet open={!!task} onClose={() => nav(-1)} labelledBy="task-title">{task && <TaskDetail task={task} onClose={() => nav(-1)} />}</Sheet>
-    </>
-  )
+  return <Tarefas openId={id} />
 }
-

@@ -60,6 +60,7 @@ function Gate() {
         <Route path="agenda" element={<Agenda />} />
         <Route path="tarefas" element={<Tarefas />} />
         <Route path="tarefas/:key" element={<Tarefas />} />
+        <Route path="tarefas/:key/:task" element={<Tarefas />} />
         <Route path="tarefa/:id" element={<TarefaRoute />} />
         <Route path="financas" element={<Financas />} />
         <Route path="ciclo" element={<Ciclo />} />
