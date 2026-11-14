@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { DEMO, callFunction, insert, saveRule, update } from '../lib/db'
+import { DEMO, callFunction, insert, saveRule, update, updateWhere } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { CURRENCIES, CURRENCY_INFO, money, parseMoney } from '../lib/money'
 import { addDays, fmt, fromYmd, weekStart, ymd } from '../lib/dates'
 import { newCycleDates, EXEC_WEEKS } from '../lib/cycle'
-import { useCalendars } from '../lib/calendars'
-import type { Area, AreaColor, Cycle, Expense, Income, Integration, Reflection, Step } from '../lib/types'
+import { useCalendars, useGoogleLink } from '../lib/calendars'
+import type { Area, AreaColor, Cycle, Expense, Income, Reflection, Step } from '../lib/types'
 import { AreaIcon, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { ListInput } from '../components/ListInput'
@@ -292,8 +292,8 @@ export function Onboarding() {
 
 /** Etapa do Google: conecta pela mesma ligação das Configurações e mostra os calendários. */
 function GoogleStep({ areas, onNext }: { areas: Area[]; onNext: () => void }) {
-  const { rows } = useRows<Integration>('integrations', { columns: 'owner_id,provider,account_email,status,last_sync_at,last_error,created_at' }, !DEMO)
-  const g = rows.find((r) => r.provider === 'google')
+  const { g: link } = useGoogleLink()
+  const g = link ?? undefined
   const cals = useCalendars(areas)
   const [msg, setMsg] = useState('')
   useEffect(() => { if (g && !g.last_sync_at) { const t = setTimeout(() => setMsg('Buscando seus calendários…'), 0); return () => clearTimeout(t) } }, [g])
@@ -302,6 +302,12 @@ function GoogleStep({ areas, onNext }: { areas: Area[]; onNext: () => void }) {
     catch (e) { setMsg(e instanceof Error ? e.message : String(e)) }
   }
   const list = cals.list.filter((c) => c.key !== 'local')
+  const twoWay = !!(g?.can_write && g?.two_way)
+  async function setWay(v: boolean) {
+    if (!g) return
+    if (v && !g.can_write) return connect()
+    try { await updateWhere('integrations', { owner_id: g.owner_id, provider: 'google' }, { two_way: v }) } catch (e) { setMsg(e instanceof Error ? e.message : String(e)) }
+  }
   return (
     <>
       <h1 className="serif onb-title">Traga sua agenda do Google.</h1>
@@ -324,8 +330,11 @@ function GoogleStep({ areas, onNext }: { areas: Area[]; onNext: () => void }) {
       )}
       <span className="mono muted">Como sincronizar</span>
       <div className="stack" style={{ gap: 8 }}>
-        <div className="choice" aria-disabled style={{ opacity: 0.55 }}><span className="medium">Nos dois sentidos <span className="pill caption">em breve</span></span><span className="caption muted">O que você criar aqui também vai para o Google.</span></div>
-        <div className="choice on"><span className="medium">Só mostrar no app</span><span className="caption muted">O Google continua sendo o lugar de editar.</span></div>
+        <button className={'choice' + (twoWay ? ' on' : '')} aria-pressed={twoWay} disabled={!g} style={!g ? { opacity: 0.55 } : undefined} onClick={() => setWay(true)}>
+          <span className="medium">Nos dois sentidos</span><span className="caption muted">O que você criar ou mudar aqui também vai para o Google.</span></button>
+        <button className={'choice' + (!twoWay ? ' on' : '')} aria-pressed={!twoWay} disabled={!g} style={!g ? { opacity: 0.55 } : undefined} onClick={() => setWay(false)}>
+          <span className="medium">Só mostrar no app</span><span className="caption muted">O Google continua sendo o lugar de editar.</span></button>
+        {g && !g.can_write && <span className="caption muted">Para os dois sentidos, o Google precisa da permissão de criar e editar eventos. <button className="caption" style={{ textDecoration: 'underline' }} onClick={connect}>Ligar de novo e permitir</button></span>}
       </div>
       <div className="row between"><button className="btn ghost" onClick={onNext}>Pular</button><button className="btn primary" onClick={onNext}>Continuar</button></div>
     </>

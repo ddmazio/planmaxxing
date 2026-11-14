@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { addMonths, endOfMonth, startOfMonth } from 'date-fns'
-import { insert, remove, update } from '../lib/db'
+import { addMonths, endOfMonth, formatDistanceToNow, startOfMonth } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { DEMO, insert, remove, rpc, touch, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, hhmm, isSameDay, toIso, todayYmd, weekDays, weekStart, ymd } from '../lib/dates'
-import { layoutDay, useCalendars } from '../lib/calendars'
-import type { Area, CalEvent } from '../lib/types'
+import { layoutDay, useCalendars, useGoogleLink } from '../lib/calendars'
+import type { Area, CalEvent, ConflictSide, EventConflict } from '../lib/types'
 import { Sheet, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 
@@ -38,6 +39,9 @@ export function Agenda() {
   const cals = useCalendars(areas)
   const events = all.filter(cals.visible)
   const hiddenCount = cals.list.filter((c) => !c.visible).length
+  const link = useGoogleLink()
+  const { rows: conflicts } = useRows<EventConflict>('event_conflicts', { order: { column: 'created_at' } }, !DEMO && link.canWrite)
+  const [conflictsOpen, setConflictsOpen] = useState(false)
 
   const editing = sp.get('evento'), creating = sp.get('novo')
   const current = all.find((e) => e.id === editing) ?? null
@@ -68,6 +72,13 @@ export function Agenda() {
         </div>
       </header>
 
+      {conflicts.length > 0 && (
+        <div className="banner row between" role="status" style={{ background: 'var(--relacoes-bg)', color: 'var(--relacoes-fg)', flexWrap: 'wrap', gap: 8 }}>
+          <span>{conflicts.length === 1 ? 'Um compromisso mudou aqui e no Google ao mesmo tempo.' : `${conflicts.length} compromissos mudaram aqui e no Google ao mesmo tempo.`} Nada foi sobrescrito.</span>
+          <button className="btn secondary small" onClick={() => setConflictsOpen(true)}>Escolher a versão</button>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: showPanel ? '220px minmax(0, 1fr)' : 'minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
         {showPanel && <div className="card" style={{ padding: 8, position: 'sticky', top: 16 }}><CalendarList cals={cals} /></div>}
         {view === 'mes' ? (
@@ -77,11 +88,15 @@ export function Agenda() {
         )}
       </div>
 
+      <Sheet open={conflictsOpen && conflicts.length > 0} onClose={() => setConflictsOpen(false)} labelledBy="conflict-title">
+        {conflicts[0] && <ConflictView key={conflicts[0].id} c={conflicts[0]} left={conflicts.length} onDone={() => { touch('event_conflicts'); touch('events'); if (conflicts.length <= 1) setConflictsOpen(false) }} />}
+      </Sheet>
+
       <Sheet open={calsOpen} onClose={() => setCalsOpen(false)} title="Agendas" labelledBy="cals-sheet"><CalendarList cals={cals} /></Sheet>
 
       <Sheet open={!!(current || creating)} onClose={() => { const n = new URLSearchParams(sp); n.delete('evento'); n.delete('novo'); setSp(n, { replace: true }) }}
         title={current ? 'Compromisso' : 'Novo compromisso'} labelledBy="ev-title">
-        {(current || creating) && <EventForm key={current?.id ?? creating} ev={current} day={creating && creating !== '1' ? creating : todayYmd()} areas={areas}
+        {(current || creating) && <EventForm key={current?.id ?? creating} ev={current} day={creating && creating !== '1' ? creating : todayYmd()} areas={areas} link={link}
           onDone={() => { const n = new URLSearchParams(sp); n.delete('evento'); n.delete('novo'); setSp(n, { replace: true }) }} />}
       </Sheet>
     </div>
@@ -237,7 +252,10 @@ function Month({ date, ws, events, paint, onPick }: { date: Date; ws: number; ev
   )
 }
 
-function EventForm({ ev, day, areas, onDone }: { ev: CalEvent | null; day: string; areas: Area[]; onDone: () => void }) {
+function EventForm({ ev, day, areas, link, onDone }: { ev: CalEvent | null; day: string; areas: Area[]; link: ReturnType<typeof useGoogleLink>; onDone: () => void }) {
+  const fromGoogle = !!ev?.external_id?.startsWith('gcal:') && !ev?.sync_google
+  const [toGoogle, setToGoogle] = useState(ev ? !!ev.sync_google : link.twoWay)
+  const goesToGoogle = link.canWrite && (fromGoogle ? link.twoWay : toGoogle)
   const start = ev ? new Date(ev.starts_at) : null, end = ev ? new Date(ev.ends_at) : null
   const [f, setF] = useState({
     title: ev?.title ?? '', date: start ? ymd(start) : day, from: start ? hhmm(ev!.starts_at) : '09:00', to: end ? hhmm(ev!.ends_at) : '10:00',
@@ -250,12 +268,15 @@ function EventForm({ ev, day, areas, onDone }: { ev: CalEvent | null; day: strin
     const s = toIso(f.date, f.all_day ? '00:00' : f.from), e = toIso(f.date, f.all_day ? '23:59' : f.to)
     if (e < s) return setErr('O fim precisa ser depois do início.')
     const row: Partial<CalEvent> = { title: f.title.trim(), starts_at: s, ends_at: e, all_day: f.all_day, kind: f.kind as CalEvent['kind'], area_id: f.area_id || null, location: f.location || null, notes: f.notes || null, reminder_minutes: f.reminder }
+    if (link.canWrite && !fromGoogle) row.sync_google = toGoogle
     if (ev) await update<CalEvent>('events', ev.id, row); else await insert<CalEvent>('events', row)
     onDone()
   }
   return (
     <form className="stack" onSubmit={(e) => { e.preventDefault(); save() }}>
-      {ev?.external_id?.startsWith('gcal:') && <div className="banner caption">Veio do Google Agenda. Se mudar aqui e importar de novo, volta a ficar como está no Google.</div>}
+      {fromGoogle && <div className="banner caption">{link.twoWay ? 'Veio do Google Agenda. O que você mudar aqui vai para lá também.'
+        : link.canWrite ? 'Veio do Google Agenda. Para mandar mudanças daqui para lá, ligue “nos dois sentidos” em Configurações → Conexões.'
+        : 'Veio do Google Agenda. Se mudar aqui, na próxima sincronização volta a ficar como está no Google.'}</div>}
       <input id="ev-title" className="input" style={{ fontSize: 20 }} autoFocus placeholder="Consulta médica" value={f.title} maxLength={200} onChange={(e) => setF({ ...f, title: e.target.value })} aria-label="Título" />
       <div className="seg">{([['appointment', 'Compromisso'], ['plan', 'Bloco do plano']] as const).map(([k, l]) => <button type="button" key={k} className={f.kind === k ? 'on' : ''} onClick={() => setF({ ...f, kind: k })}>{l}</button>)}</div>
       <div className="row"><label className="field grow"><span>Data</span><input type="date" required className="input" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label></div>
@@ -268,12 +289,72 @@ function EventForm({ ev, day, areas, onDone }: { ev: CalEvent | null; day: strin
       <label className="field"><span>Local</span><input className="input" value={f.location} maxLength={200} onChange={(e) => setF({ ...f, location: e.target.value })} /></label>
       <label className="field"><span>Lembrete</span><select className="input" value={f.reminder} onChange={(e) => setF({ ...f, reminder: Number(e.target.value) })}>
         {[[0, 'Na hora'], [10, '10 min antes'], [30, '30 min antes'], [60, '1 hora antes'], [1440, '1 dia antes']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      {link.canWrite && !fromGoogle && (
+        <div className="row"><div className="grow stack" style={{ gap: 0 }}><span>Salvar também no Google</span>
+          <span className="caption muted">{ev?.sync_google && ev.external_id ? 'Está no Google também. Desligar não apaga de lá.' : 'Vai para a sua agenda principal do Google.'}</span></div>
+          <Toggle label="Salvar também no Google" on={toGoogle} onChange={setToGoogle} /></div>
+      )}
       <label className="field"><span>Notas</span><textarea className="input" value={f.notes} maxLength={5000} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
       {err && <p role="alert" className="caption" style={{ color: 'var(--danger)', margin: 0 }}>{err}</p>}
       <div className="row">
-        {ev && <button type="button" className="btn danger" onClick={async () => { if (confirm('Apagar este compromisso?')) { await remove('events', ev.id); onDone() } }}>Apagar</button>}
+        {ev && <button type="button" className="btn danger" onClick={async () => { if (confirm(goesToGoogle && ev.external_id ? 'Apagar este compromisso? Ele sai do Google também.' : 'Apagar este compromisso?')) { await remove('events', ev.id); onDone() } }}>Apagar</button>}
         <button className="btn primary grow">{ev ? 'Salvar' : 'Criar compromisso'}</button>
       </div>
     </form>
+  )
+}
+
+// ---------------------------------------------------------------- conflito: mudou aqui e no Google
+const when = (x: ConflictSide) => {
+  const d = new Date(x.starts_at)
+  const day = fmt(d, "EEE, d 'de' MMM")
+  return x.all_day ? `${day} · dia inteiro` : `${day} · ${hhmm(x.starts_at)}–${hhmm(x.ends_at)}`
+}
+const FIELDS: [string, (x: ConflictSide) => string][] = [
+  ['Título', (x) => x.title], ['Quando', when], ['Local', (x) => x.location || '—'], ['Notas', (x) => x.notes || '—'],
+]
+
+export function ConflictView({ c, left, onDone }: { c: EventConflict; left: number; onDone: () => void }) {
+  const [busy, setBusy] = useState<'' | 'app' | 'google'>('')
+  const [err, setErr] = useState('')
+  const pick = async (keep: 'app' | 'google') => {
+    setBusy(keep); setErr('')
+    try { await rpc('resolve_event_conflict', { p_id: c.id, p_keep: keep }); onDone() } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    setBusy('')
+  }
+  const side = (who: 'app' | 'google', x: ConflictSide, other: ConflictSide) => (
+    <div className="card stack conflict-side" style={{ gap: 10 }}>
+      <div className="stack" style={{ gap: 0 }}>
+        <span className="mono muted">{who === 'app' ? 'No Dream Board' : 'No Google Agenda'}</span>
+        {who === 'google' && x.updated && <span className="caption muted">mudou {formatDistanceToNow(new Date(x.updated), { addSuffix: true, locale: ptBR })}</span>}
+        {who === 'app' && <span className="caption muted">a sua edição aqui</span>}
+      </div>
+      {FIELDS.map(([label, get]) => {
+        const v = get(x), diff = v !== get(other)
+        return (
+          <div key={label} className="stack" style={{ gap: 0 }}>
+            <span className="caption muted">{label}</span>
+            <span className={diff ? 'conflict-diff medium' : ''} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{v}</span>
+          </div>
+        )
+      })}
+      <button className={'btn ' + (who === 'app' ? 'primary' : 'secondary')} disabled={!!busy} onClick={() => pick(who)}>
+        {busy === who ? 'Salvando…' : 'Ficar com esta'}
+      </button>
+    </div>
+  )
+  return (
+    <div className="stack" style={{ gap: 14 }}>
+      <div className="stack" style={{ gap: 4 }}>
+        {left > 1 && <span className="caption muted">1 de {left}</span>}
+        <h2 id="conflict-title" className="h2" style={{ margin: 0 }}>Este evento mudou nos dois lugares</h2>
+        <p className="caption muted" style={{ margin: 0 }}>Você mudou aqui e ele também mudou no Google antes de a sua edição chegar lá. Escolha qual versão fica; a outra é descartada nos dois lugares. O que está diferente aparece marcado.</p>
+      </div>
+      <div className="conflict-grid">
+        {side('app', c.local, c.remote)}
+        {side('google', c.remote, c.local)}
+      </div>
+      {err && <p role="alert" className="caption" style={{ color: 'var(--danger)', margin: 0 }}>{err}</p>}
+    </div>
   )
 }

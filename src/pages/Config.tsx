@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
-import { DEMO, callFunction, exportAll, insert, removeImportedGoogle, removeWhere, select, syncExternalEvents, touch, update } from '../lib/db'
+import { DEMO, callFunction, exportAll, insert, removeImportedGoogle, removeWhere, select, syncExternalEvents, touch, update, updateWhere } from '../lib/db'
 import { currentSub, disablePush, enablePush, pushSupport, testPush } from '../lib/push'
 import { CurrencySheet } from './Financas'
 import { useRows } from '../lib/hooks'
 import { CURRENCY_INFO } from '../lib/money'
 import { fetchEvents, getToken, listCalendars, syncCalendars } from '../lib/gcal'
+import { INTEGRATION_COLS } from '../lib/calendars'
 import { fmt } from '../lib/dates'
 import type { Area, AreaColor, CalEvent, Integration, PushSub } from '../lib/types'
 import { formatDistanceToNow } from 'date-fns'
@@ -410,11 +411,11 @@ function GoogleAgenda() {
 // ---------------------------------------------------------------- ligações automáticas (servidor)
 // Microsoft To Do fica pronto no servidor, mas escondido até haver um registro de app na Microsoft
 const ACTIVE_SERVICES = ['google'] as const
-const COLS = 'owner_id,provider,account_email,status,last_sync_at,last_error,created_at'
+const COLS = INTEGRATION_COLS
 const SERVICES = {
   google: {
     title: 'Google Agenda', icon: 'calendar',
-    desc: 'Atualiza sozinho a cada 15 minutos, mesmo com o app fechado: eventos novos, mudados e apagados. Só leitura, nada muda no Google. Na Agenda você escolhe quais agendas mostrar.',
+    desc: 'Atualiza sozinho a cada 15 minutos, mesmo com o app fechado: eventos novos, mudados e apagados. Na Agenda você escolhe quais agendas mostrar e, se quiser, salva compromissos lá também.',
   },
   microsoft: {
     title: 'Microsoft To Do', icon: 'check',
@@ -434,9 +435,10 @@ function Connections() {
     const svc = (ok ?? sp.get('servico')) as keyof typeof SERVICES | null
     const name = svc && SERVICES[svc] ? SERVICES[svc].title : 'o serviço'
     const motivo = sp.get('motivo') ?? ''
-    setNotice(ok ? { msg: `${name} ligado. A primeira sincronização começou e leva até 2 minutos.`, err: false }
+    const noWrite = sp.get('escrita') === 'nao'
+    setNotice(ok ? { msg: `${name} ligado. A primeira sincronização começou e leva até 2 minutos.${noWrite ? ' A caixinha de criar e editar eventos ficou desmarcada, então o app só lê a sua agenda.' : ''}`, err: false }
       : { msg: motivo === 'cancelado' ? 'Você cancelou a ligação. Nada mudou.' : motivo.includes('permiss') ? 'Faltou marcar a caixinha da agenda na tela do Google. Tente de novo.' : `Não deu para ligar ${name}${motivo ? ` (${motivo})` : ''}.`, err: true })
-    const n = new URLSearchParams(sp); ['conectado', 'conexao', 'servico', 'motivo', 'code'].forEach((k) => n.delete(k)); setSp(n, { replace: true })
+    const n = new URLSearchParams(sp); ['conectado', 'conexao', 'servico', 'motivo', 'code', 'escrita'].forEach((k) => n.delete(k)); setSp(n, { replace: true })
   }, [sp, setSp])
 
   // enquanto a primeira sincronização não acaba, confere a cada 10 s
@@ -456,6 +458,36 @@ function Connections() {
         : missing ? <div className="card caption" style={{ color: 'var(--danger)' }}>Falta rodar no Supabase o arquivo 20261112000000_sincronizacao.sql.</div>
         : (ACTIVE_SERVICES).map((p) => <ServiceCard key={p} provider={p} row={rows.find((r) => r.provider === p)} me={session?.user.id ?? ''} />)}
     </>
+  )
+}
+
+/** Escrever no Google: precisa da permissão de escrita; "nos dois sentidos" é escolha da pessoa. */
+function GoogleWrite({ row, busy, onReconnect, me }: { row: Integration; busy: boolean; onReconnect: () => void; me: string }) {
+  const [err, setErr] = useState('')
+  if (!row.can_write) return (
+    <div className="stack" style={{ gap: 6, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+      <span className="medium">Salvar compromissos no Google</span>
+      <span className="caption muted">Hoje o app só lê a sua agenda. Para salvar compromissos lá e sincronizar nos dois sentidos, o Google precisa da permissão de criar e editar eventos. Você liga de novo e marca a caixinha.</span>
+      <button className="btn secondary small" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={onReconnect}>Permitir salvar no Google</button>
+    </div>
+  )
+  const set = async (v: boolean) => {
+    setErr('')
+    try { await updateWhere('integrations', { owner_id: me, provider: 'google' }, { two_way: v }) } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+  }
+  return (
+    <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+      <span className="medium">Como sincronizar</span>
+      <button className={'choice' + (row.two_way ? ' on' : '')} aria-pressed={!!row.two_way} onClick={() => set(true)}>
+        <span className="medium">Nos dois sentidos</span>
+        <span className="caption muted">O que você cria, muda ou apaga aqui vai para o Google, inclusive nos eventos que vieram de lá. Se algo mudar nos dois lugares, o app pergunta qual versão fica.</span>
+      </button>
+      <button className={'choice' + (!row.two_way ? ' on' : '')} aria-pressed={!row.two_way} onClick={() => set(false)}>
+        <span className="medium">Só trazer para cá</span>
+        <span className="caption muted">O Google continua sendo o lugar de editar. Só vai para lá o compromisso em que você marcar “Salvar também no Google”.</span>
+      </button>
+      {err && <span className="caption" style={{ color: 'var(--danger)' }}>{err}</span>}
+    </div>
   )
 }
 
@@ -513,6 +545,7 @@ function ServiceCard({ provider, row, me }: { provider: 'google' | 'microsoft'; 
         <button className="btn primary" disabled={!!busy} onClick={connect}>{busy === 'connect' ? 'Abrindo…' : `Ligar ${svc.title}`}</button>
       )}
       {msg && <span className="caption">{msg}</span>}
+      {provider === 'google' && row && <GoogleWrite row={row} busy={!!busy} onReconnect={connect} me={me} />}
       {provider === 'google' && !row && <GoogleAgenda />}
     </div>
   )

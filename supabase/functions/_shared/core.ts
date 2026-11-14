@@ -1,16 +1,75 @@
 /** Lógica das sincronizações. Recebe o banco já autenticado como servidor. */
 import { type Db, inList } from './rest.ts'
-import { calendarRow, eventKey, listCalendars, listEvents, toRow } from './google.ts'
+import { type AppEvent, type GCal, type GEvent, GoogleError, calendarRow, evPath, eventKey, gwrite, listCalendars, listEvents, parseEventKey, sameContent, toGoogle, toRow } from './google.ts'
 import { type AppTask, type MsList, type MsTask, appToMs, graph, listKey, msToApp, parseTaskKey, taskKey } from './microsoft.ts'
 import { ymdIn } from './time.ts'
 
 const chunks = <T>(xs: T[], n: number) => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n))
 const DAY = 864e5
 
-// ---------------------------------------------------------------- Google Agenda (só leitura)
-export async function syncGoogle(db: Db, owner: string, tz: string, access: string, last: { last_sync_at: string | null; last_full_sync_at: string | null }, forceFull = false) {
+// ---------------------------------------------------------------- Google Agenda (leitura; escrita quando a pessoa permitiu)
+const EV_COLS = 'id,title,starts_at,ends_at,all_day,location,notes,external_id,remote_updated'
+interface OutEv { id: number; op: 'upsert' | 'delete'; entity_id: string; external_id: string | null }
+
+/** Envia ao Google o que mudou no app. Se o evento mudou nos dois lugares, abre um conflito em vez de sobrescrever. */
+export async function pushGoogle(db: Db, owner: string, tz: string, access: string, cals: GCal[]) {
+  const primary = cals.find((c) => c.primary)?.id
+  const calOf = (id: string): GCal => cals.find((c) => c.id === id) ?? { id, summary: id }
+  let sent = 0, conflicts = 0
+  for (let round = 0; round < 10; round++) {
+    const items = await db.rpc<OutEv[]>('sync_take_google', { p_owner: owner, p_limit: 200 })
+    if (!items?.length) break
+    const last = new Map<string, OutEv>()
+    for (const it of items) last.set(it.entity_id, { ...it, external_id: last.get(it.entity_id)?.external_id ?? it.external_id })
+    for (const it of last.values()) {
+      try {
+        if (it.op === 'delete') {
+          const k = parseEventKey(it.external_id)
+          if (k) await gwrite(access, 'DELETE', evPath(k.calId, k.evId))
+          sent++; continue
+        }
+        const [row] = await db.get<AppEvent[]>(`events?select=${EV_COLS}&id=eq.${it.entity_id}`)
+        if (!row) continue
+        const open = await db.get<{ id: string }[]>(`event_conflicts?select=id&event_id=eq.${row.id}`)
+        if (open.length) continue // espera a pessoa escolher
+        const body = toGoogle(row, tz)
+        const k = parseEventKey(row.external_id)
+        if (k) {
+          const remote = await gwrite<GEvent>(access, 'GET', evPath(k.calId, k.evId))
+          if (remote && remote.status !== 'cancelled') {
+            const changedThere = !!(remote.updated && row.remote_updated && Date.parse(remote.updated) > Date.parse(row.remote_updated) + 1000)
+            if (changedThere) {
+              const theirs = toRow(remote, calOf(k.calId), tz)
+              if (theirs && sameContent(theirs, row)) { await db.patch(`events?id=eq.${row.id}`, { remote_updated: remote.updated }); continue }
+              if (theirs) {
+                const local = { title: row.title, starts_at: row.starts_at, ends_at: row.ends_at, all_day: row.all_day, location: row.location, notes: row.notes }
+                await db.insert('event_conflicts', [{ owner_id: owner, event_id: row.id, local, remote: { ...theirs, updated: remote.updated } }])
+                conflicts++; continue
+              }
+            }
+            const saved = await gwrite<GEvent>(access, 'PATCH', evPath(k.calId, k.evId), body)
+            if (saved) { await db.patch(`events?id=eq.${row.id}`, { remote_updated: saved.updated ?? null }); sent++; continue }
+          }
+          // apagado no Google mas editado aqui: a edição mais nova vale, volta a existir lá
+        }
+        const target = k?.calId ?? primary
+        if (!target) continue
+        const created = await gwrite<GEvent>(access, 'POST', evPath(target), body)
+        if (created) { await db.patch(`events?id=eq.${row.id}`, { external_id: eventKey(target, created.id), remote_updated: created.updated ?? null }); sent++ }
+      } catch (e) {
+        if (e instanceof GoogleError && e.status === 401) throw e
+        console.error('google push', it.op, (e as Error).message)
+      }
+    }
+  }
+  return { sent, conflicts }
+}
+
+export async function syncGoogle(db: Db, owner: string, tz: string, access: string, last: { last_sync_at: string | null; last_full_sync_at: string | null }, forceFull = false, canWrite = false) {
   const now = Date.now()
   const cals = await listCalendars(access)
+  // 1. o que mudou no app vai primeiro
+  const pushed = canWrite ? await pushGoogle(db, owner, tz, access, cals) : { sent: 0, conflicts: 0 }
 
   // agendas: novas entram como no Google; as que já existem mantêm a escolha de mostrar/esconder
   const existing = await db.getAll<{ id: string; external_id: string; name: string; color: string | null; position: number }>(
@@ -43,20 +102,31 @@ export async function syncGoogle(db: Db, owner: string, tz: string, access: stri
       if (r) rows.push({ owner_id: owner, ...r })
     }
   }
+  const fetched = new Set(rows.map((r) => r.external_id as string))
+  // 2. o que veio do Google; fica de fora o que ainda espera para subir ou está em conflito
+  if (canWrite && rows.length) {
+    const waiting = await db.getAll<{ entity_id: string }>(`sync_outbox?select=entity_id&owner_id=eq.${owner}&provider=eq.google`)
+    const conflicted = await db.getAll<{ event_id: string }>(`event_conflicts?select=event_id&owner_id=eq.${owner}`)
+    const ids = [...new Set([...waiting.map((w) => w.entity_id), ...conflicted.map((c) => c.event_id)])]
+    if (ids.length) {
+      const held = new Set<string>()
+      for (const part of chunks(ids, 100)) for (const e of await db.get<{ external_id: string | null }[]>(`events?select=external_id&id=in.(${part.join(',')})`)) if (e.external_id) held.add(e.external_id)
+      for (let i = rows.length - 1; i >= 0; i--) if (held.has(rows[i].external_id as string)) rows.splice(i, 1)
+    }
+  }
   for (const part of chunks(rows, 500)) await db.upsert('events', part, 'owner_id,external_id')
   for (const part of chunks(cancelled, 80)) await db.del(`events?owner_id=eq.${owner}&external_id=in.${encodeURIComponent(inList(part))}`)
 
   let removed = cancelled.length
   if (full) {
     // reconciliação diária: o que sumiu do Google (inclusive de agendas apagadas) sai daqui
-    const keep = new Set(rows.map((r) => r.external_id as string))
     const have = await db.getAll<{ id: string; external_id: string }>(
       `events?select=id,external_id&owner_id=eq.${owner}&external_id=like.gcal:*&starts_at=gte.${encodeURIComponent(timeMin)}&starts_at=lt.${encodeURIComponent(timeMax)}`)
-    const stale = have.filter((e) => !keep.has(e.external_id)).map((e) => e.id)
+    const stale = have.filter((e) => !fetched.has(e.external_id)).map((e) => e.id)
     for (const part of chunks(stale, 100)) await db.del(`events?id=in.(${part.join(',')})`)
     removed += stale.length
   }
-  return { full, saved: rows.length, removed, calendars: cals.length }
+  return { full, saved: rows.length, removed, calendars: cals.length, ...pushed }
 }
 
 // ---------------------------------------------------------------- Microsoft To Do (nos dois sentidos)

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { insert, update } from './db'
+import { DEMO, insert, update } from './db'
 import { useRows } from './hooks'
-import type { Area, Calendar, CalEvent } from './types'
+import type { Area, Calendar, CalEvent, Integration } from './types'
 
 export const LOCAL_CAL = 'local'
 
@@ -59,4 +59,13 @@ export function layoutDay(evs: CalEvent[], minMinutes = 28) {
   }
   flush()
   return out
+}
+
+export const INTEGRATION_COLS = 'owner_id,provider,account_email,status,last_sync_at,last_error,created_at,can_write,two_way'
+
+/** A ligação com o Google (se houver) e se dá para escrever lá. */
+export function useGoogleLink(enabled = true) {
+  const { rows } = useRows<Integration>('integrations', { columns: INTEGRATION_COLS, eq: { provider: 'google' } }, enabled && !DEMO)
+  const g = rows[0] ?? null
+  return { g, canWrite: !!g?.can_write, twoWay: !!(g?.can_write && g?.two_way) }
 }

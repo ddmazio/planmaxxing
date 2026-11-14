@@ -74,6 +74,9 @@ function graphDate(v) {
 }
 
 // supabase/functions/_shared/google.ts
+var READ_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+var WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+var GOOGLE_SCOPE = `openid email ${READ_SCOPE} ${WRITE_SCOPE}`;
 var API = "https://www.googleapis.com/calendar/v3";
 var calKey = (calId) => `gcal:${calId}`.slice(0, 300);
 var eventKey = (calId, evId) => `gcal:${calId}:${evId}`.slice(0, 300);
@@ -98,9 +101,9 @@ function toRow(e, c, tz) {
     starts_at: starts,
     ends_at: ends,
     all_day: allDay,
-    kind: "appointment",
     location: e.location ? e.location.slice(0, 200) : null,
-    notes: notes ? notes.slice(0, 5e3) : null
+    notes: notes ? notes.slice(0, 5e3) : null,
+    remote_updated: e.updated ?? null
   };
 }
 function calendarRow(c, i) {
@@ -154,6 +157,46 @@ async function refreshGoogle(clientId, clientSecret, refreshToken) {
   if (!r.ok) throw new Error(j.error === "invalid_grant" ? "O Google desligou o acesso. Ligue de novo em Configura\xE7\xF5es." : `Google token ${r.status}`);
   return j.access_token;
 }
+function parseEventKey(k) {
+  if (!k?.startsWith("gcal:")) return null;
+  const rest = k.slice(5), i = rest.indexOf(":");
+  if (i <= 0 || i === rest.length - 1) return null;
+  return { calId: rest.slice(0, i), evId: rest.slice(i + 1) };
+}
+function toGoogle(r, tz) {
+  const description = (r.notes ?? "").replace(/^Agenda: [^\n]*(\n\n|\n|$)/, "");
+  const base = { summary: r.title, location: r.location ?? "", description };
+  if (r.all_day) {
+    const a = ymdIn(new Date(r.starts_at), tz), b = ymdIn(new Date(r.ends_at), tz);
+    return { ...base, start: { date: a, dateTime: null }, end: { date: addDaysYmd(b < a ? a : b, 1), dateTime: null } };
+  }
+  return { ...base, start: { dateTime: new Date(r.starts_at).toISOString(), date: null }, end: { dateTime: new Date(r.ends_at).toISOString(), date: null } };
+}
+var sameContent = (a, b) => a.title === b.title && Date.parse(a.starts_at) === Date.parse(b.starts_at) && Date.parse(a.ends_at) === Date.parse(b.ends_at) && a.all_day === b.all_day && (a.location ?? "") === (b.location ?? "") && (a.notes ?? "") === (b.notes ?? "");
+var GoogleError = class extends Error {
+  constructor(status, msg) {
+    super(msg);
+    this.status = status;
+  }
+  status;
+};
+async function gwrite(token, method, path, body) {
+  const r = await fetch(`${API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...body ? { "Content-Type": "application/json" } : {} },
+    body: body ? JSON.stringify(body) : void 0
+  });
+  if (r.status === 404 || r.status === 410) {
+    await r.body?.cancel().catch(() => {
+    });
+    return null;
+  }
+  if (!r.ok) throw new GoogleError(r.status, `Google ${method} ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (r.status === 204) return null;
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
+}
+var evPath = (calId, evId) => `/calendars/${encodeURIComponent(calId)}/events${evId ? `/${encodeURIComponent(evId)}` : ""}`;
 
 // supabase/functions/_shared/microsoft.ts
 var MS_SCOPE = "offline_access User.Read Tasks.ReadWrite";
@@ -263,9 +306,74 @@ async function graph(token, method, pathOrUrl, body) {
 // supabase/functions/_shared/core.ts
 var chunks = (xs, n) => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
 var DAY = 864e5;
-async function syncGoogle(db2, owner, tz, access, last, forceFull = false) {
+var EV_COLS = "id,title,starts_at,ends_at,all_day,location,notes,external_id,remote_updated";
+async function pushGoogle(db2, owner, tz, access, cals) {
+  const primary = cals.find((c) => c.primary)?.id;
+  const calOf = (id) => cals.find((c) => c.id === id) ?? { id, summary: id };
+  let sent = 0, conflicts = 0;
+  for (let round = 0; round < 10; round++) {
+    const items = await db2.rpc("sync_take_google", { p_owner: owner, p_limit: 200 });
+    if (!items?.length) break;
+    const last = /* @__PURE__ */ new Map();
+    for (const it of items) last.set(it.entity_id, { ...it, external_id: last.get(it.entity_id)?.external_id ?? it.external_id });
+    for (const it of last.values()) {
+      try {
+        if (it.op === "delete") {
+          const k2 = parseEventKey(it.external_id);
+          if (k2) await gwrite(access, "DELETE", evPath(k2.calId, k2.evId));
+          sent++;
+          continue;
+        }
+        const [row] = await db2.get(`events?select=${EV_COLS}&id=eq.${it.entity_id}`);
+        if (!row) continue;
+        const open = await db2.get(`event_conflicts?select=id&event_id=eq.${row.id}`);
+        if (open.length) continue;
+        const body = toGoogle(row, tz);
+        const k = parseEventKey(row.external_id);
+        if (k) {
+          const remote = await gwrite(access, "GET", evPath(k.calId, k.evId));
+          if (remote && remote.status !== "cancelled") {
+            const changedThere = !!(remote.updated && row.remote_updated && Date.parse(remote.updated) > Date.parse(row.remote_updated) + 1e3);
+            if (changedThere) {
+              const theirs = toRow(remote, calOf(k.calId), tz);
+              if (theirs && sameContent(theirs, row)) {
+                await db2.patch(`events?id=eq.${row.id}`, { remote_updated: remote.updated });
+                continue;
+              }
+              if (theirs) {
+                const local = { title: row.title, starts_at: row.starts_at, ends_at: row.ends_at, all_day: row.all_day, location: row.location, notes: row.notes };
+                await db2.insert("event_conflicts", [{ owner_id: owner, event_id: row.id, local, remote: { ...theirs, updated: remote.updated } }]);
+                conflicts++;
+                continue;
+              }
+            }
+            const saved = await gwrite(access, "PATCH", evPath(k.calId, k.evId), body);
+            if (saved) {
+              await db2.patch(`events?id=eq.${row.id}`, { remote_updated: saved.updated ?? null });
+              sent++;
+              continue;
+            }
+          }
+        }
+        const target = k?.calId ?? primary;
+        if (!target) continue;
+        const created = await gwrite(access, "POST", evPath(target), body);
+        if (created) {
+          await db2.patch(`events?id=eq.${row.id}`, { external_id: eventKey(target, created.id), remote_updated: created.updated ?? null });
+          sent++;
+        }
+      } catch (e) {
+        if (e instanceof GoogleError && e.status === 401) throw e;
+        console.error("google push", it.op, e.message);
+      }
+    }
+  }
+  return { sent, conflicts };
+}
+async function syncGoogle(db2, owner, tz, access, last, forceFull = false, canWrite = false) {
   const now = Date.now();
   const cals = await listCalendars(access);
+  const pushed = canWrite ? await pushGoogle(db2, owner, tz, access, cals) : { sent: 0, conflicts: 0 };
   const existing = await db2.getAll(
     `calendars?select=id,external_id,name,color,position&owner_id=eq.${owner}&external_id=like.gcal:*`
   );
@@ -298,19 +406,29 @@ async function syncGoogle(db2, owner, tz, access, last, forceFull = false) {
       if (r) rows.push({ owner_id: owner, ...r });
     }
   }
+  const fetched = new Set(rows.map((r) => r.external_id));
+  if (canWrite && rows.length) {
+    const waiting = await db2.getAll(`sync_outbox?select=entity_id&owner_id=eq.${owner}&provider=eq.google`);
+    const conflicted = await db2.getAll(`event_conflicts?select=event_id&owner_id=eq.${owner}`);
+    const ids = [.../* @__PURE__ */ new Set([...waiting.map((w) => w.entity_id), ...conflicted.map((c) => c.event_id)])];
+    if (ids.length) {
+      const held = /* @__PURE__ */ new Set();
+      for (const part of chunks(ids, 100)) for (const e of await db2.get(`events?select=external_id&id=in.(${part.join(",")})`)) if (e.external_id) held.add(e.external_id);
+      for (let i = rows.length - 1; i >= 0; i--) if (held.has(rows[i].external_id)) rows.splice(i, 1);
+    }
+  }
   for (const part of chunks(rows, 500)) await db2.upsert("events", part, "owner_id,external_id");
   for (const part of chunks(cancelled, 80)) await db2.del(`events?owner_id=eq.${owner}&external_id=in.${encodeURIComponent(inList(part))}`);
   let removed = cancelled.length;
   if (full) {
-    const keep = new Set(rows.map((r) => r.external_id));
     const have = await db2.getAll(
       `events?select=id,external_id&owner_id=eq.${owner}&external_id=like.gcal:*&starts_at=gte.${encodeURIComponent(timeMin)}&starts_at=lt.${encodeURIComponent(timeMax)}`
     );
-    const stale = have.filter((e) => !keep.has(e.external_id)).map((e) => e.id);
+    const stale = have.filter((e) => !fetched.has(e.external_id)).map((e) => e.id);
     for (const part of chunks(stale, 100)) await db2.del(`events?id=in.(${part.join(",")})`);
     removed += stale.length;
   }
-  return { full, saved: rows.length, removed, calendars: cals.length };
+  return { full, saved: rows.length, removed, calendars: cals.length, ...pushed };
 }
 async function graphAll(token, path) {
   const out = [];
@@ -498,11 +616,14 @@ Deno.serve(async (req) => {
   }
   const filter = owners ? `&owner_id=in.(${owners.join(",")})` : "";
   const provider = body.provider === "google" || body.provider === "microsoft" ? `&provider=eq.${body.provider}` : "";
-  const integs = await db.get(`integrations?select=owner_id,provider,status,state,last_sync_at,last_full_sync_at${filter}${provider}`);
+  const integs = await db.get(`integrations?select=owner_id,provider,status,state,last_sync_at,last_full_sync_at,can_write${filter}${provider}`);
   const report = [];
   for (const it of integs) {
     const since = it.last_sync_at ? Date.now() - Date.parse(it.last_sync_at) : Infinity;
-    if (!manual && it.provider === "google" && since < 14 * 6e4) continue;
+    if (!manual && it.provider === "google" && since < 14 * 6e4) {
+      const waiting = it.can_write ? await db.get(`sync_outbox?select=id&owner_id=eq.${it.owner_id}&provider=eq.google&limit=1`) : [];
+      if (!waiting.length) continue;
+    }
     if (!manual && it.status === "error" && since < 60 * 6e4) continue;
     if (!await db.rpc("sync_lease", { p_owner: it.owner_id, p_provider: it.provider, p_seconds: 140 })) continue;
     const where = `integrations?owner_id=eq.${it.owner_id}&provider=eq.${it.provider}`;
@@ -513,7 +634,7 @@ Deno.serve(async (req) => {
       if (!token) throw new Error("Sem chave guardada. Ligue de novo em Configura\xE7\xF5es.");
       if (it.provider === "google") {
         const access = await refreshGoogle(env("GOOGLE_CLIENT_ID"), env("GOOGLE_CLIENT_SECRET"), token);
-        const r = await syncGoogle(db, it.owner_id, tz, access, it, manual);
+        const r = await syncGoogle(db, it.owner_id, tz, access, it, manual, it.can_write);
         await db.patch(where, { last_sync_at: (/* @__PURE__ */ new Date()).toISOString(), ...r.full ? { last_full_sync_at: (/* @__PURE__ */ new Date()).toISOString() } : {}, status: "active", last_error: null });
         report.push({ provider: "google", ...r });
       } else {

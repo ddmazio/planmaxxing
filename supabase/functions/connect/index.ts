@@ -2,7 +2,7 @@
 // POST (com o login da pessoa): devolve o endereço de autorização do Google ou da Microsoft.
 // GET (volta do Google/Microsoft): troca o código pela chave permanente, guarda no Vault e volta ao app.
 import { makeDb, projectKeys } from '../_shared/rest.ts'
-import { GOOGLE_SCOPE } from '../_shared/google.ts'
+import { GOOGLE_SCOPE, grants } from '../_shared/google.ts'
 import { MS_SCOPE } from '../_shared/microsoft.ts'
 import { signState, verifyState } from '../_shared/state.ts'
 
@@ -50,10 +50,11 @@ async function exchange(provider: 'google' | 'microsoft', code: string) {
     })
     const j = await r.json()
     if (!r.ok || !j.refresh_token) throw new Error(j.error ?? 'sem chave permanente')
-    if (!String(j.scope ?? '').includes('calendar.readonly')) throw new Error('permissão da agenda não marcada')
+    const g = grants(String(j.scope ?? ''))
+    if (!g.read) throw new Error('permissão da agenda não marcada')
     let email: string | null = null
     try { email = JSON.parse(atob(j.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email ?? null } catch { /* sem e-mail */ }
-    return { refresh: j.refresh_token as string, email }
+    return { refresh: j.refresh_token as string, email, write: g.write }
   }
   const r = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -63,7 +64,7 @@ async function exchange(provider: 'google' | 'microsoft', code: string) {
   if (!r.ok || !j.refresh_token) throw new Error(j.error_description?.slice(0, 120) ?? j.error ?? 'sem chave permanente')
   const me = await fetch('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName', { headers: { Authorization: `Bearer ${j.access_token}` } })
   const mj = me.ok ? await me.json() : {}
-  return { refresh: j.refresh_token as string, email: (mj.mail || mj.userPrincipalName || null) as string | null }
+  return { refresh: j.refresh_token as string, email: (mj.mail || mj.userPrincipalName || null) as string | null, write: true }
 }
 
 Deno.serve(async (req) => {
@@ -76,11 +77,12 @@ Deno.serve(async (req) => {
     const provider = st.p as 'google' | 'microsoft'
     if (url.searchParams.get('error')) return back(`conexao=erro&servico=${provider}&motivo=cancelado`)
     try {
-      const { refresh, email } = await exchange(provider, url.searchParams.get('code') ?? '')
+      const { refresh, email, write } = await exchange(provider, url.searchParams.get('code') ?? '')
       await db.rpc('integration_save', { p_owner: st.u, p_provider: provider, p_email: email, p_token: refresh })
+      if (provider === 'google') await db.patch(`integrations?owner_id=eq.${st.u}&provider=eq.google`, { can_write: write, ...(write ? {} : { two_way: false }) })
       // primeira sincronização já, sem esperar o próximo ciclo
       await db.rpc('sync_ping', { p_owner: st.u }).catch(() => {})
-      return back(`conectado=${provider}`)
+      return back(`conectado=${provider}${provider === 'google' && !write ? '&escrita=nao' : ''}`)
     } catch (e) {
       console.error('connect', provider, (e as Error).message)
       return back(`conexao=erro&servico=${provider}&motivo=${encodeURIComponent((e as Error).message.slice(0, 80))}`)

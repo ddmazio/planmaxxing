@@ -26,7 +26,7 @@ async function userOf(req: Request) {
   return r.ok ? ((await r.json()) as { id: string }) : null
 }
 
-interface Integ { owner_id: string; provider: 'google' | 'microsoft'; status: string; state: MsState; last_sync_at: string | null; last_full_sync_at: string | null }
+interface Integ { owner_id: string; provider: 'google' | 'microsoft'; status: string; state: MsState; last_sync_at: string | null; last_full_sync_at: string | null; can_write: boolean }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors(req) })
@@ -47,12 +47,16 @@ Deno.serve(async (req) => {
 
   const filter = owners ? `&owner_id=in.(${owners.join(',')})` : ''
   const provider = body.provider === 'google' || body.provider === 'microsoft' ? `&provider=eq.${body.provider}` : ''
-  const integs = await db.get<Integ[]>(`integrations?select=owner_id,provider,status,state,last_sync_at,last_full_sync_at${filter}${provider}`)
+  const integs = await db.get<Integ[]>(`integrations?select=owner_id,provider,status,state,last_sync_at,last_full_sync_at,can_write${filter}${provider}`)
   const report: Record<string, unknown>[] = []
 
   for (const it of integs) {
     const since = it.last_sync_at ? Date.now() - Date.parse(it.last_sync_at) : Infinity
-    if (!manual && it.provider === 'google' && since < 14 * 60000) continue
+    // Google a cada 15 min, ou já, se há algo do app esperando para subir
+    if (!manual && it.provider === 'google' && since < 14 * 60000) {
+      const waiting = it.can_write ? await db.get<unknown[]>(`sync_outbox?select=id&owner_id=eq.${it.owner_id}&provider=eq.google&limit=1`) : []
+      if (!waiting.length) continue
+    }
     if (!manual && it.status === 'error' && since < 60 * 60000) continue
     if (!(await db.rpc<boolean>('sync_lease', { p_owner: it.owner_id, p_provider: it.provider, p_seconds: 140 }))) continue
     const where = `integrations?owner_id=eq.${it.owner_id}&provider=eq.${it.provider}`
@@ -63,7 +67,7 @@ Deno.serve(async (req) => {
       if (!token) throw new Error('Sem chave guardada. Ligue de novo em Configurações.')
       if (it.provider === 'google') {
         const access = await refreshGoogle(env('GOOGLE_CLIENT_ID'), env('GOOGLE_CLIENT_SECRET'), token)
-        const r = await syncGoogle(db, it.owner_id, tz, access, it, manual)
+        const r = await syncGoogle(db, it.owner_id, tz, access, it, manual, it.can_write)
         await db.patch(where, { last_sync_at: new Date().toISOString(), ...(r.full ? { last_full_sync_at: new Date().toISOString() } : {}), status: 'active', last_error: null })
         report.push({ provider: 'google', ...r })
       } else {

@@ -44,7 +44,13 @@ function projectKeys(env2) {
 }
 
 // supabase/functions/_shared/google.ts
-var GOOGLE_SCOPE = "openid email https://www.googleapis.com/auth/calendar.readonly";
+var READ_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+var WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+var GOOGLE_SCOPE = `openid email ${READ_SCOPE} ${WRITE_SCOPE}`;
+var grants = (scope) => {
+  const s = scope.split(/\s+/);
+  return { read: s.includes(READ_SCOPE), write: s.includes(WRITE_SCOPE) };
+};
 
 // supabase/functions/_shared/microsoft.ts
 var MS_SCOPE = "offline_access User.Read Tasks.ReadWrite";
@@ -134,13 +140,14 @@ async function exchange(provider, code) {
     });
     const j2 = await r2.json();
     if (!r2.ok || !j2.refresh_token) throw new Error(j2.error ?? "sem chave permanente");
-    if (!String(j2.scope ?? "").includes("calendar.readonly")) throw new Error("permiss\xE3o da agenda n\xE3o marcada");
+    const g = grants(String(j2.scope ?? ""));
+    if (!g.read) throw new Error("permiss\xE3o da agenda n\xE3o marcada");
     let email = null;
     try {
       email = JSON.parse(atob(j2.id_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).email ?? null;
     } catch {
     }
-    return { refresh: j2.refresh_token, email };
+    return { refresh: j2.refresh_token, email, write: g.write };
   }
   const r = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
     method: "POST",
@@ -151,7 +158,7 @@ async function exchange(provider, code) {
   if (!r.ok || !j.refresh_token) throw new Error(j.error_description?.slice(0, 120) ?? j.error ?? "sem chave permanente");
   const me = await fetch("https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName", { headers: { Authorization: `Bearer ${j.access_token}` } });
   const mj = me.ok ? await me.json() : {};
-  return { refresh: j.refresh_token, email: mj.mail || mj.userPrincipalName || null };
+  return { refresh: j.refresh_token, email: mj.mail || mj.userPrincipalName || null, write: true };
 }
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors(req) });
@@ -162,11 +169,12 @@ Deno.serve(async (req) => {
     const provider = st.p;
     if (url.searchParams.get("error")) return back(`conexao=erro&servico=${provider}&motivo=cancelado`);
     try {
-      const { refresh, email } = await exchange(provider, url.searchParams.get("code") ?? "");
+      const { refresh, email, write } = await exchange(provider, url.searchParams.get("code") ?? "");
       await db.rpc("integration_save", { p_owner: st.u, p_provider: provider, p_email: email, p_token: refresh });
+      if (provider === "google") await db.patch(`integrations?owner_id=eq.${st.u}&provider=eq.google`, { can_write: write, ...write ? {} : { two_way: false } });
       await db.rpc("sync_ping", { p_owner: st.u }).catch(() => {
       });
-      return back(`conectado=${provider}`);
+      return back(`conectado=${provider}${provider === "google" && !write ? "&escrita=nao" : ""}`);
     } catch (e) {
       console.error("connect", provider, e.message);
       return back(`conexao=erro&servico=${provider}&motivo=${encodeURIComponent(e.message.slice(0, 80))}`);
