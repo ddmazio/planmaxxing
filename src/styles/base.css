@@ -379,3 +379,10 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .date-chip .mono { font-size: 10px; color: var(--text-secondary); }
 .notas-row { padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 8px; }
 .notas-row:last-child { border-bottom: 0; }
+
+/* grupo */
+.member-card { gap: 10px; }
+.member-quote { font-size: 20px; line-height: 26px; margin: 0; }
+.assignee { width: auto; min-height: 30px; padding: 0 8px; font-size: 12px; }
+.chat .bubble { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 14px; background: var(--bg-muted); max-width: 85%; align-self: flex-start; }
+.chat .bubble.mine { align-self: flex-end; background: var(--lime-soft, #eef6c8); }

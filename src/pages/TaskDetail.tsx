@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { DEMO, insert, remove, update } from '../lib/db'
+import { DEMO, insert, remove, touch, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { fmt, fromYmd, todayYmd } from '../lib/dates'
 import { REPEAT_LABEL, toggleTask } from '../lib/tasks'
 import { EXEC_WEEKS, weekOf } from '../lib/cycle'
-import type { Area, List, Step, Task, TaskItem } from '../lib/types'
+import type { Area, List, ListMember, Step, Task, TaskComment, TaskItem } from '../lib/types'
 import { Check, Sheet, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { useCycle } from './Ciclo'
@@ -26,6 +26,7 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose: () => void 
   const { rows: lists } = useRows<List>('lists', { order: { column: 'position' } })
   const { rows: areas } = useRows<Area>('areas', { eq: { archived: false }, order: { column: 'position' } })
   const { cycle, goals, steps } = useCycle()
+  const { rows: members } = useRows<ListMember>('list_members', { eq: { list_id: task.list_id ?? '' } }, !DEMO && !!task.list_id)
   const [newItem, setNewItem] = useState('')
   const [toStep, setToStep] = useState(false)
   const today = todayYmd()
@@ -37,15 +38,20 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose: () => void 
   const created = task.created_at ? new Date(task.created_at) : null
   const mine = !task.owner_id || task.owner_id === session?.user.id || DEMO
   const by = mine ? 'você' : people.find((p) => p.id === task.owner_id)?.display_name?.split(' ')[0] ?? 'alguém do grupo'
+  const me = session?.user.id
+  const shared = !DEMO && !!list && (list.owner_id !== me || members.length > 0)
+  const crew = shared && list ? [list.owner_id!, ...members.map((m) => m.user_id)].filter((v, i, a) => v && a.indexOf(v) === i) : []
+  const who = (id: string) => (id === me ? 'Você' : people.find((p) => p.id === id)?.display_name?.split(' ')[0] ?? 'Alguém')
   const createdLabel = created ? (created.toISOString().slice(0, 10) === today ? 'hoje' : `em ${fmt(created, "d 'de' MMM")}`) : ''
 
   return (
     <div className="stack task-detail">
       <div className="row between">
-        <span className="mono muted" style={{ textTransform: 'uppercase' }}>{step ? 'Passo da meta' : list?.name ?? 'Inbox'}</span>
+        <span className="mono muted" style={{ textTransform: 'uppercase' }}>{step ? `Passo · meta “${stepGoal?.title ?? ''}”` : list?.name ?? 'Inbox'}{shared ? ' · partilhada' : ''}</span>
         <button className="icon-btn" aria-label="Fechar" onClick={onClose}><Icon name="x" size={18} /></button>
       </div>
 
+      {shared && <span className="mono muted" style={{ marginBottom: -8 }}>Quem faz o quê</span>}
       <div className="card stack" style={{ gap: 0, padding: '6px 16px' }}>
         <div className="row" style={{ padding: '8px 0' }}>
           <Check done={!!task.completed_at} onToggle={() => toggleTask(task)} label="Concluir tarefa" />
@@ -60,6 +66,11 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose: () => void 
               <span className={it.done ? 'done-text' : ''}>{it.title}</span>
               {it.id === next?.id && <span className="caption muted row" style={{ gap: 4 }}><Icon name="sun" size={12} />Próxima etapa · aparece no Hoje</span>}
             </div>
+            {shared && (
+              <select className="input assignee" value={it.assignee ?? ''} onChange={(e) => update<TaskItem>('task_items', it.id, { assignee: e.target.value || null })} aria-label={`Quem faz: ${it.title}`}>
+                <option value="">ninguém</option>{crew.map((u) => <option key={u} value={u}>{who(u)}</option>)}
+              </select>
+            )}
             <button aria-label="Apagar etapa" className="faint" onClick={() => remove('task_items', it.id)}><Icon name="x" size={16} /></button>
           </div>
         ))}
@@ -101,6 +112,8 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose: () => void 
           <div className="list-row"><Icon name="users" /><span className="grow">Compartilhar</span><span className="caption muted">{DEMO ? 'precisa de conta' : 'mova para uma lista'}</span></div>
         )}
       </div>
+
+      {shared && <Conversa taskId={task.id} who={who} me={me} />}
 
       <label className="stack" style={{ gap: 6 }}><span className="mono muted">NOTA</span>
         <textarea key={task.id} className="input" rows={3} placeholder="Ex.: vence dia 15, lançar em Finanças como necessidade." defaultValue={task.notes ?? ''} maxLength={5000}
@@ -146,5 +159,30 @@ function StepSheet({ open, onClose, task, goals, current }: { open: boolean; onC
         onClose()
       }}>Transformar</button>
     </Sheet>
+  )
+}
+
+/** Conversa da tarefa partilhada (só quem vê a tarefa lê e escreve). */
+function Conversa({ taskId, who, me }: { taskId: string; who: (id: string) => string; me?: string }) {
+  const { rows } = useRows<TaskComment>('task_comments', { eq: { task_id: taskId }, order: { column: 'created_at' } })
+  const [text, setText] = useState('')
+  useEffect(() => { const t = setInterval(() => touch('task_comments'), 15000); return () => clearInterval(t) }, [])
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <span className="mono muted">Conversa</span>
+      <div className="card stack chat" style={{ gap: 8 }}>
+        {rows.length === 0 && <span className="caption muted">Ninguém escreveu ainda.</span>}
+        {rows.map((c) => (
+          <div key={c.id} className={'bubble' + (c.author_id === me ? ' mine' : '')}>
+            <span className="caption medium">{who(c.author_id)} <span className="muted">· {new Date(c.created_at).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}</span></span>
+            <span>{c.body}</span>
+          </div>
+        ))}
+        <form className="row" style={{ gap: 8 }} onSubmit={async (e) => { e.preventDefault(); const b = text.trim(); if (!b) return; setText(''); await insert<TaskComment>('task_comments', { task_id: taskId, body: b }) }}>
+          <input className="input grow" placeholder="Escreva para o grupo" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} aria-label="Mensagem" />
+          <button className="btn primary small" disabled={!text.trim()}>Enviar</button>
+        </form>
+      </div>
+    </div>
   )
 }

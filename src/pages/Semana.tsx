@@ -6,7 +6,7 @@ import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, todayYmd, ymd } from '../lib/dates'
 import { EXEC_WEEKS, score, weekOf } from '../lib/cycle'
 import { cycleWeekDays } from '../lib/execution'
-import type { CalEvent, Checkin, Group, Habit, HabitLog, Reflection, Step } from '../lib/types'
+import type { CalEvent, Checkin, Cheer, Group, Habit, HabitLog, Reflection, Step } from '../lib/types'
 import { AreaTag, Empty, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
@@ -79,7 +79,7 @@ export function Ritual() {
       for (const g of groups) {
         const gw = groupWeek(g)
         const mine = await rpcMine(g.id, gw)
-        const body = { score: wScore ?? 0, intention: clean[2] || null }
+        const body = { score: wScore ?? 0, intention: clean[2] || null, worked: clean[0] || null }
         try { if (mine) await update<Checkin>('checkins', mine.id, body); else await insert<Checkin>('checkins', { group_id: g.id, week: gw, ...body }) } catch { /* segue */ }
       }
     }
@@ -353,11 +353,12 @@ function CheckinStep({ W, P, score: s, vals, setA, groups, shareOn }: { W: numbe
   const { people } = usePeople()
   const { session } = useAuth()
   const meId = session?.user.id
-  const [others, setOthers] = useState<{ group: string; user_id: string; score: number | null; intention: string | null }[]>([])
+  const [others, setOthers] = useState<{ group: string; group_id: string; user_id: string; score: number | null; intention: string | null; worked?: string | null }[]>([])
+  const [sent, setSent] = useState<string[]>([])
   useEffect(() => {
     let alive = true
-    Promise.all(groups.map((g) => rpc<{ user_id: string; score: number | null; intention: string | null }[]>('group_scores', { p_group: g.id, p_week: groupWeek(g) })
-      .then((rows) => rows.map((r) => ({ ...r, group: g.name }))).catch(() => [])))
+    Promise.all(groups.map((g) => rpc<{ user_id: string; score: number | null; intention: string | null; worked?: string | null }[]>('group_scores', { p_group: g.id, p_week: groupWeek(g) })
+      .then((rows) => rows.map((r) => ({ ...r, group: g.name, group_id: g.id }))).catch(() => [])))
       .then((all) => { if (alive) setOthers(all.flat().filter((o) => o.user_id !== meId)) })
     return () => { alive = false }
   }, [groups, meId])
@@ -389,7 +390,13 @@ function CheckinStep({ W, P, score: s, vals, setA, groups, shareOn }: { W: numbe
             <div key={o.group + o.user_id} className="row" style={{ gap: 10 }}>
               <span className="avatar" style={{ background: 'var(--bg-muted)', color: 'var(--text-primary)' }}>{nameOf(o.user_id).charAt(0)}</span>
               <div className="grow stack" style={{ gap: 0 }}><span>{nameOf(o.user_id)} · {o.score == null ? 'sem placar' : `${o.score}%`}</span>
-                {o.intention && <span className="caption muted">“{o.intention}”</span>}</div>
+                {o.intention && <span className="caption muted">“{o.intention}”</span>}
+                {o.worked && <span className="caption muted">Funcionou: {o.worked}</span>}</div>
+              <button className={'btn small ' + (sent.includes(o.group_id + o.user_id) ? 'primary' : 'secondary')} disabled={sent.includes(o.group_id + o.user_id)} onClick={async () => {
+                const g = groups.find((x) => x.id === o.group_id)!
+                try { await insert<Cheer>('cheers', { group_id: o.group_id, week: groupWeek(g), to_id: o.user_id, emoji: '👏' }) } catch { /* já mandou */ }
+                setSent([...sent, o.group_id + o.user_id])
+              }}>{sent.includes(o.group_id + o.user_id) ? '👏 Enviado' : '👏 Mande um incentivo'}</button>
             </div>
           )) : <span className="caption muted">Ninguém do grupo fez o check-in ainda.</span>}
         {groups.length > 0 && <span className="caption faint">{shareOn ? 'Ao fechar, seu placar e sua intenção vão para o check-in do grupo.' : 'Você escolheu não mostrar esta semana ao grupo.'}</span>}

@@ -30,7 +30,7 @@ export interface Task extends Owned {
   external_id?: string | null
 }
 
-export interface TaskItem extends Base { task_id: string; title: string; done: boolean; position: number }
+export interface TaskItem extends Base { task_id: string; title: string; done: boolean; position: number; assignee?: string | null }
 
 export interface CalEvent extends Owned {
   title: string; starts_at: string; ends_at: string; all_day: boolean; kind: 'plan' | 'appointment'
@@ -54,14 +54,17 @@ export interface Pot extends Owned { name: string; target_cents: number; goal_id
 export interface Subscription extends Owned { name: string; amount_cents: number; billing_day: number; last_used_on: string | null }
 export interface BudgetRule { owner_id?: string; needs_pct: number; wants_pct: number; savings_pct: number }
 export interface Group extends Base { name: string; created_by: string; checkin_weekday: number }
-export interface GroupMember { group_id: string; user_id: string; role: 'admin' | 'member'; share: 'nothing' | 'score' | 'all'; joined_at: string }
-export interface Checkin extends Owned { group_id: string; week: number; score: number | null; intention: string | null }
+export interface GroupMember { group_id: string; user_id: string; role: 'admin' | 'member'; share: 'nothing' | 'score' | 'goals' | 'all'; hidden_area_ids: string[]; shown_goal_area_ids?: string[]; joined_at: string }
+export interface Cheer { id: string; group_id: string; week: number; from_id: string; to_id: string; emoji: string; created_at: string }
+export interface TaskComment { id: string; task_id: string; author_id: string; body: string; created_at: string }
+export interface GroupInvite { id: string; group_id: string; created_at: string; expires_at: string; used_at: string | null; used_by?: string | null }
+export interface Checkin extends Owned { group_id: string; week: number; score: number | null; intention: string | null; worked?: string | null }
 export interface ListMember { list_id: string; user_id: string }
 
 export type TableName =
   | 'profiles' | 'areas' | 'lists' | 'tasks' | 'task_items' | 'events' | 'habits' | 'habit_logs'
   | 'cycles' | 'goals' | 'steps' | 'reflections' | 'expenses' | 'incomes' | 'pots' | 'subscriptions' | 'budget_rules'
-  | 'groups' | 'group_members' | 'checkins' | 'list_members' | 'calendars' | 'integrations'
+  | 'groups' | 'group_members' | 'checkins' | 'list_members' | 'calendars' | 'integrations' | 'cheers' | 'task_comments' | 'group_invites'
 
 export interface Query {
   columns?: string
