@@ -8,7 +8,7 @@ import { EXEC_WEEKS, TOTAL_WEEKS, weekOf } from '../lib/cycle'
 import { areaExecution, cycleWeekDays, execEnd } from '../lib/execution'
 import type { CalEvent, Habit, HabitLog, List, Step, Task } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
-import { AreaTag, Check, Empty, SectionHead } from '../components/ui'
+import { AreaIcon, AreaTag, Check, Empty, SectionHead } from '../components/ui'
 import { Icon } from '../components/Icon'
 import type { ShellCtx } from '../components/Shell'
 import { useCycle } from './Ciclo'
@@ -164,7 +164,7 @@ export function Hoje() {
               const v = exec.get(a.id) ?? null
               return (
                 <Link key={a.id} to={`/ciclo/area/${a.id}`} className="list-row area-exec">
-                  <span className="dot" style={{ background: `var(--${a.color}-fg)`, width: 10, height: 10 }} />
+                  <AreaIcon area={a} size={28} />
                   <span className="grow">{a.name}</span>
                   <div className="bar" style={{ width: 96 }}><span style={{ width: `${v ?? 0}%`, background: `var(--${a.color}-fg)` }} /></div>
                   <span className="mono" style={{ width: 36, textAlign: 'right' }}>{v == null ? '–' : `${v}%`}</span>

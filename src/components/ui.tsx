@@ -2,6 +2,16 @@ import { useEffect, type ReactNode } from 'react'
 import type { Area } from '../lib/types'
 import { Icon } from './Icon'
 
+/** Ícone da área num quadradinho com a cor dela (áreas novas sem ícone mostram só a bolinha). */
+export function AreaIcon({ area, size = 28 }: { area: Pick<Area, 'color' | 'icon'>; size?: number }) {
+  const has = area.icon && area.icon !== 'dot'
+  return (
+    <span className="area-icon" aria-hidden style={{ width: size, height: size, background: `var(--${area.color}-bg)`, color: `var(--${area.color}-fg)` }}>
+      {has ? <Icon name={area.icon} size={Math.round(size * 0.58)} /> : <span className="dot" style={{ background: `var(--${area.color}-fg)`, width: size * 0.36, height: size * 0.36 }} />}
+    </span>
+  )
+}
+
 export function AreaTag({ area }: { area?: Area | null }) {
   if (!area) return null
   return (

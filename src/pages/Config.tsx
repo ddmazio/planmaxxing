@@ -9,7 +9,7 @@ import { fmt } from '../lib/dates'
 import type { Area, AreaColor, Integration } from '../lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Toggle } from '../components/ui'
+import { AreaIcon, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader } from '../components/Shell'
 
@@ -105,6 +105,7 @@ function Areas() {
   useEffect(() => { if (loaded && location.hash === '#areas') document.getElementById('areas')?.scrollIntoView({ behavior: 'smooth' }) }, [loaded])
   const [name, setName] = useState('')
   const [color, setColor] = useState<AreaColor>('neutro')
+  const [icon, setIcon] = useState('dot')
   const active = areas.filter((a) => !a.archived)
   const archived = areas.filter((a) => a.archived)
   return (
@@ -113,7 +114,7 @@ function Areas() {
       <div className="card flush list">
         {active.map((a) => (
           <div key={a.id} className="list-row" style={{ flexWrap: 'wrap', rowGap: 8 }}>
-            <ColorPick value={a.color} onChange={(c) => update<Area>('areas', a.id, { color: c })} />
+            <LookPick color={a.color} icon={a.icon} onChange={(patch) => update<Area>('areas', a.id, patch)} />
             <input className="input bare grow" defaultValue={a.name} maxLength={40} aria-label={`Nome da área ${a.name}`} disabled={a.is_fixed}
               onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== a.name) update<Area>('areas', a.id, { name: v }) }} />
             {a.is_fixed ? <span className="caption muted row" style={{ gap: 4 }}><Icon name="lock" size={14} />sempre ativa</span> : (
@@ -126,8 +127,8 @@ function Areas() {
           </div>
         ))}
         <form className="list-row" onSubmit={async (e) => { e.preventDefault(); const v = name.trim(); if (!v) return; setName('')
-          await insert<Area>('areas', { name: v, color, icon: 'dot', position: areas.length + 1, focus: false, is_fixed: false, archived: false }) }}>
-          <ColorPick value={color} onChange={setColor} />
+          await insert<Area>('areas', { name: v, color, icon, position: areas.length + 1, focus: false, is_fixed: false, archived: false }) }}>
+          <LookPick color={color} icon={icon} onChange={(p) => { if (p.color) setColor(p.color); if (p.icon) setIcon(p.icon) }} />
           <input className="input bare grow" placeholder="Nova área" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} aria-label="Nova área" />
           <button className="btn secondary small" disabled={!name.trim()}>Adicionar</button>
         </form>
@@ -139,14 +140,25 @@ function Areas() {
   )
 }
 
-function ColorPick({ value, onChange }: { value: AreaColor; onChange: (c: AreaColor) => void }) {
+const ICONS = ['briefcase', 'book', 'heart', 'users', 'wallet', 'sparkle', 'sun', 'star', 'home', 'target', 'pin', 'note', 'clock', 'bell', 'dot']
+
+/** Cor e ícone de uma área: toca no quadradinho para escolher. */
+function LookPick({ color, icon, onChange }: { color: AreaColor; icon: string; onChange: (p: { color?: AreaColor; icon?: string }) => void }) {
   const [open, setOpen] = useState(false)
   return (
     <span style={{ position: 'relative' }}>
-      <button type="button" aria-label="Mudar cor" onClick={() => setOpen(!open)} className="dot" style={{ width: 18, height: 18, background: `var(--${value}-fg)`, display: 'block' }} />
+      <button type="button" aria-label="Mudar cor e ícone" aria-expanded={open} onClick={() => setOpen(!open)} style={{ display: 'block' }}><AreaIcon area={{ color, icon }} size={32} /></button>
       {open && (
-        <span className="card row" style={{ position: 'absolute', top: 26, left: -8, zIndex: 5, padding: 8, gap: 6, boxShadow: 'var(--shadow-float)' }}>
-          {COLORS.map((c) => <button type="button" key={c} aria-label={c} onClick={() => { onChange(c); setOpen(false) }} className="dot" style={{ width: 22, height: 22, background: `var(--${c}-fg)`, boxShadow: c === value ? '0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ink)' : undefined }} />)}
+        <span className="card stack look-pop" onMouseLeave={() => setOpen(false)}>
+          <span className="mono muted">Cor</span>
+          <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            {COLORS.map((c) => <button type="button" key={c} aria-label={c} aria-pressed={c === color} onClick={() => onChange({ color: c })} className="dot" style={{ width: 24, height: 24, background: `var(--${c}-fg)`, boxShadow: c === color ? '0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ink)' : undefined }} />)}
+          </span>
+          <span className="mono muted">Ícone</span>
+          <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            {ICONS.map((i) => <button type="button" key={i} aria-label={i === 'dot' ? 'sem ícone' : i} aria-pressed={i === icon} onClick={() => { onChange({ icon: i }); setOpen(false) }}
+              style={{ borderRadius: 10, boxShadow: i === icon ? '0 0 0 2px var(--ink)' : undefined }}><AreaIcon area={{ color, icon: i }} size={32} /></button>)}
+          </span>
         </span>
       )}
     </span>

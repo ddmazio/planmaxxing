@@ -7,7 +7,7 @@ import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/d
 import { EXEC_WEEKS, TOTAL_WEEKS, currentCycle, daysUntil, newCycleDates, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
 import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, Step, Task } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
-import { AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
+import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
 
@@ -433,7 +433,7 @@ export function AreaPage() {
         <div className="row between" style={{ alignItems: 'flex-start', flexWrap: 'wrap', rowGap: 12 }}>
           <div className="stack" style={{ gap: 4 }}>
             <span className="mono" style={{ textTransform: 'uppercase' }}>Área da vida · {area.is_fixed ? 'sempre ligada' : focus ? 'foco neste ciclo' : 'manutenção'}</span>
-            <h1 className="h1">{area.name}</h1>
+            <h1 className="h1 row" style={{ gap: 12 }}><AreaIcon area={area} size={40} />{area.name}</h1>
           </div>
           <div className="row" style={{ gap: 8 }}>
             <button className="area-score" onClick={() => setEditing(true)} aria-label="Editar notas da área">

@@ -281,3 +281,14 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .dg-cell.can { cursor: pointer; }
 .dg-cell.can:hover, .dg-cell.over { background: var(--lime-soft, rgba(212, 241, 84, .35)); }
 .dg-ev { font-size: 11px; line-height: 14px; padding: 2px 4px; border-radius: 6px; background: var(--bg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ícone das áreas */
+.area-icon { display: inline-grid; place-items: center; flex: none; border-radius: 30%; }
+.look-pop { position: absolute; top: 40px; left: -8px; z-index: 5; padding: 12px; gap: 8px; width: 264px; box-shadow: var(--shadow-float); }
+
+/* barra lateral: o meio rola, a pessoa fica sempre visível embaixo */
+@media (min-width: 1024px) {
+  .sidebar { overflow: hidden; }
+  .side-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin: 0 -4px; padding: 0 4px; scrollbar-width: thin; }
+  .side-user { flex: none; margin-top: 8px; box-shadow: 0 -1px 0 var(--border); border-radius: 0 0 12px 12px; }
+}

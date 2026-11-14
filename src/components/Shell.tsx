@@ -7,7 +7,7 @@ import { currentCycle, weekOf, TOTAL_WEEKS } from '../lib/cycle'
 import { Icon } from './Icon'
 import { QuickAdd } from './QuickAdd'
 import { Search } from './Search'
-import { Toast } from './ui'
+import { AreaIcon, Toast } from './ui'
 
 const MAIN: [string, string, string][] = [
   ['/', 'Hoje', 'home'], ['/agenda', 'Agenda', 'calendar'], ['/tarefas', 'Tarefas', 'check'], ['/financas', 'Finanças', 'wallet'], ['/ciclo', 'Ciclo', 'target'],
@@ -41,18 +41,19 @@ export function Shell() {
     <div className="app">
       <aside className="sidebar" aria-label="Navegação">
         <div className="brand"><span className="brand-mark">db</span>Dream Board</div>
+        <div className="side-scroll">
         {SIDE.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => 'nav-item' + (isActive(to) ? ' active' : '')}><Icon name={icon} />{label}</NavLink>
         ))}
         <button className="nav-item" onClick={() => setQuick(true)}><Icon name="plus" />Novo</button>
         <div className="nav-section mono faint">Áreas da vida</div>
         {areas.map((a) => (
-          <NavLink key={a.id} to={a.is_fixed ? '/financas' : `/ciclo/area/${a.id}`} className={() => 'nav-item' + (loc.pathname === `/ciclo/area/${a.id}` ? ' active' : '')} style={{ paddingTop: 8, paddingBottom: 8 }}>
-            <span className="dot" style={{ background: `var(--${a.color}-fg)`, width: 10, height: 10 }} />{a.name}
+          <NavLink key={a.id} to={a.is_fixed ? '/financas' : `/ciclo/area/${a.id}`} className={() => 'nav-item' + (loc.pathname === `/ciclo/area/${a.id}` ? ' active' : '')} style={{ paddingTop: 6, paddingBottom: 6 }}>
+            <AreaIcon area={a} size={26} />{a.name}
           </NavLink>
         ))}
         <NavLink to="/config#areas" className="nav-item faint" style={{ paddingTop: 8, paddingBottom: 8 }}><Icon name="plus" size={16} />Editar áreas</NavLink>
-        <div className="grow" />
+        </div>
         <NavLink to="/config" className={() => 'nav-item side-user' + (isActive('/config') ? ' active' : '')} aria-label="Configurações">
           <span className="avatar">{name.charAt(0).toUpperCase()}</span>
           <span className="grow stack" style={{ gap: 0 }}>
