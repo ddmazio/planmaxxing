@@ -114,7 +114,7 @@ export function Hoje() {
 
       {emptyCycle && (
         <div className="card stack">
-          <span className="h3">Seu ciclo começou. Ainda não tem nada aqui, e tudo bem.</span>
+          <span className="h3">{week === 0 ? `Seu ciclo começa em ${fmt(fromYmd(cycle!.starts_on), "d 'de' MMM")}. Ainda não tem nada aqui, e tudo bem.` : 'Seu ciclo começou. Ainda não tem nada aqui, e tudo bem.'}</span>
           <span className="muted">Comece com uma meta só. O resto (passos, hábitos, agenda) aparece aqui sozinho.</span>
           <Link className="btn primary" style={{ alignSelf: 'flex-start' }} to="/ciclo">Criar a primeira meta</Link>
           <span className="mono muted" style={{ marginTop: 8 }}>Ou comece por</span>

@@ -1,7 +1,7 @@
 // Junta cada Edge Function num arquivo único (supabase/functions-dist/<nome>.ts),
 // para colar no editor do painel do Supabase. Uso: node scripts/bundle-functions.mjs
 import { build } from 'esbuild'
-for (const name of ['connect', 'sync']) {
+for (const name of ['connect', 'sync', 'notify']) {
   await build({
     entryPoints: [`supabase/functions/${name}/index.ts`],
     outfile: `supabase/functions-dist/${name}.ts`,

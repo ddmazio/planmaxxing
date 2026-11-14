@@ -14,7 +14,7 @@ import { Onboarding } from './pages/Onboarding'
 import { Hoje } from './pages/Hoje'
 import { Tarefas, TarefaRoute } from './pages/Tarefas'
 import { Agenda } from './pages/Agenda'
-import { Config, applyTheme, savedTheme } from './pages/Config'
+import { Config, applyTheme, savedTheme, ConfigAreas, ConfigConexoes, ConfigDados, ConfigNotificacoes } from './pages/Config'
 import { Financas } from './pages/Financas'
 import { AceitarConvite, Grupo } from './pages/Grupo'
 import { Reflexoes } from './pages/Reflexoes'
@@ -73,6 +73,10 @@ function Gate() {
         <Route path="grupo" element={<Grupo />} />
         <Route path="convite/:token" element={<ConviteRoute />} />
         <Route path="config" element={<Config />} />
+        <Route path="config/areas" element={<ConfigAreas />} />
+        <Route path="config/conexoes" element={<ConfigConexoes />} />
+        <Route path="config/notificacoes" element={<ConfigNotificacoes />} />
+        <Route path="config/dados" element={<ConfigDados />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -31,6 +31,8 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/auth\//],
         runtimeCaching: [],
+        // avisos (push) e o clique neles
+        importScripts: ['push-sw.js'],
         cleanupOutdatedCaches: true,
         // versão nova assume na hora (sem esperar fechar todas as janelas do app)
         skipWaiting: true,

@@ -412,7 +412,7 @@ function RuleSheet({ open, onClose, rule, income, fmt$ }: { open: boolean; onClo
 }
 
 // ---------------------------------------------------------------- moeda
-function CurrencySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function CurrencySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { profile, saveProfile } = useAuth()
   const [q, setQ] = useState('')
   const [main, setMain] = useState(profile?.currency_main ?? 'EUR')

@@ -386,3 +386,4 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .assignee { width: auto; min-height: 30px; padding: 0 8px; font-size: 12px; }
 .chat .bubble { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 14px; background: var(--bg-muted); max-width: 85%; align-self: flex-start; }
 .chat .bubble.mine { align-self: flex-end; background: var(--lime-soft, #eef6c8); }
+.offline-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--ink); color: var(--on-ink); font-size: 13px; }

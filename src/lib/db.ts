@@ -225,3 +225,13 @@ export async function callFunction<T>(name: string, body: Record<string, unknown
   }
   return data as T
 }
+
+/** Desconectar o Google: apaga os eventos importados de lá e a lista de calendários (os criados no app ficam). */
+export async function removeImportedGoogle(owner: string) {
+  if (DEMO) return
+  const a = await supabase!.from('events').delete().eq('owner_id', owner).like('external_id', 'gcal:%')
+  if (a.error) throw a.error
+  const b = await supabase!.from('calendars').delete().eq('owner_id', owner)
+  if (b.error) throw b.error
+  notify('events'); notify('calendars')
+}

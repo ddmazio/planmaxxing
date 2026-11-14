@@ -13,6 +13,8 @@ export interface Profile {
   currencies_extra: string[]
   week_starts_on: number
   onboarded: boolean
+  /** preferências de aviso e consentimentos (ver supabase/functions/_shared/notify.ts) */
+  notify?: Record<string, unknown>
 }
 
 export interface Area extends Owned {
@@ -55,6 +57,7 @@ export interface Subscription extends Owned { name: string; amount_cents: number
 export interface BudgetRule { owner_id?: string; needs_pct: number; wants_pct: number; savings_pct: number }
 export interface Group extends Base { name: string; created_by: string; checkin_weekday: number }
 export interface GroupMember { group_id: string; user_id: string; role: 'admin' | 'member'; share: 'nothing' | 'score' | 'goals' | 'all'; hidden_area_ids: string[]; shown_goal_area_ids?: string[]; joined_at: string }
+export interface PushSub { id: string; owner_id: string; endpoint: string; p256dh: string; auth: string; device: string | null; created_at: string }
 export interface Cheer { id: string; group_id: string; week: number; from_id: string; to_id: string; emoji: string; created_at: string }
 export interface TaskComment { id: string; task_id: string; author_id: string; body: string; created_at: string }
 export interface GroupInvite { id: string; group_id: string; created_at: string; expires_at: string; used_at: string | null; used_by?: string | null }
@@ -64,7 +67,7 @@ export interface ListMember { list_id: string; user_id: string }
 export type TableName =
   | 'profiles' | 'areas' | 'lists' | 'tasks' | 'task_items' | 'events' | 'habits' | 'habit_logs'
   | 'cycles' | 'goals' | 'steps' | 'reflections' | 'expenses' | 'incomes' | 'pots' | 'subscriptions' | 'budget_rules'
-  | 'groups' | 'group_members' | 'checkins' | 'list_members' | 'calendars' | 'integrations' | 'cheers' | 'task_comments' | 'group_invites'
+  | 'groups' | 'group_members' | 'checkins' | 'list_members' | 'calendars' | 'integrations' | 'cheers' | 'task_comments' | 'group_invites' | 'push_subscriptions'
 
 export interface Query {
   columns?: string

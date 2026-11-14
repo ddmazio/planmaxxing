@@ -36,6 +36,12 @@ export function Shell() {
     return () => window.removeEventListener('keydown', on)
   }, [])
   const name = profile?.display_name || 'Você'
+  const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine)
+  useEffect(() => {
+    const on = () => setOffline(!navigator.onLine)
+    window.addEventListener('online', on); window.addEventListener('offline', on)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', on) }
+  }, [])
 
   return (
     <div className="app">
@@ -52,7 +58,7 @@ export function Shell() {
             <AreaIcon area={a} size={26} />{a.name}
           </NavLink>
         ))}
-        <NavLink to="/config#areas" className="nav-item faint" style={{ paddingTop: 8, paddingBottom: 8 }}><Icon name="plus" size={16} />Editar áreas</NavLink>
+        <NavLink to="/config/areas" className="nav-item faint" style={{ paddingTop: 8, paddingBottom: 8 }}><Icon name="plus" size={16} />Editar áreas</NavLink>
         </div>
         <NavLink to="/config" className={() => 'nav-item side-user' + (isActive('/config') ? ' active' : '')} aria-label="Configurações">
           <span className="avatar">{name.charAt(0).toUpperCase()}</span>
@@ -65,6 +71,7 @@ export function Shell() {
       </aside>
 
       <main className="main">
+        {offline && <div className="offline-bar" role="status"><Icon name="repeat" size={14} />Sem conexão. O que já está na tela continua aqui; mudanças feitas agora podem não ser guardadas até a internet voltar.</div>}
         {demo && <div className="banner" style={{ maxWidth: 1224, margin: '0 auto 12px' }}>Modo demonstração: os dados ficam só neste aparelho. Ligue o Supabase para sincronizar e partilhar.</div>}
         <Outlet context={{ openQuick: () => setQuick(true), openSearch: () => setSearch(true), toast: toast.show }} />
       </main>
