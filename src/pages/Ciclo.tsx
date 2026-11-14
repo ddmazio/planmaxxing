@@ -7,6 +7,7 @@ import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/d
 import { EXEC_WEEKS, TOTAL_WEEKS, currentCycle, daysUntil, newCycleDates, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
 import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, Step, Task } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
+import { GoalWizard } from '../components/GoalWizard'
 import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
@@ -185,13 +186,14 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
         ))}
       </div>
 
-      {ended && (
-        <div className="card soft row between" style={{ flexWrap: 'wrap' }}>
-          <span>As 13 semanas acabaram. Faça a revisão final e encerre para começar o próximo ciclo.</span>
-          <button className="btn primary small" onClick={close}>Encerrar ciclo</button>
-        </div>
+      {(ended || now >= EXEC_WEEKS) && (
+        <Link to="/ciclo/trimestre" className="card lime row between" style={{ flexWrap: 'wrap', gap: 8 }}>
+          <div className="stack" style={{ gap: 2 }}><span className="medium">{ended ? 'As 13 semanas acabaram.' : now === TOTAL_WEEKS ? 'É a 13ª semana: hora do ritual do trimestre.' : 'O ciclo está acabando.'}</span>
+            <span className="caption">Olhar para trás, decidir e organizar o próximo ciclo · 3 partes, no seu ritmo.</span></div>
+          <span className="btn primary small">Fazer o ritual do trimestre</span>
+        </Link>
       )}
-      {!ended && now >= 1 && !reviewedNow && (
+      {!ended && now >= 1 && now < TOTAL_WEEKS && !reviewedNow && (
         <Link to="/ciclo/ritual" className="banner row between"><span>Ainda não fez o ritual desta semana. Leva uns 10 minutos.</span><Icon name="chevron" size={16} /></Link>
       )}
 
@@ -267,7 +269,9 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
           ) : <Empty>Cada ritual semanal fica guardado aqui.</Empty>}
 
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <Link className="btn ghost small" to="/ciclo/trimestre"><Icon name="sparkle" size={14} />Ritual do trimestre</Link>
             {!ended && <button className="btn ghost small" onClick={close}>Encerrar ciclo antes do fim</button>}
+            {ended && <button className="btn ghost small" onClick={close}>Encerrar sem o ritual</button>}
             <button className="btn ghost small" style={{ color: 'var(--danger)' }} onClick={() => setDeleting(true)}><Icon name="trash" size={14} />Apagar ciclo e recomeçar</button>
           </div>
         </div>
@@ -309,7 +313,7 @@ function GoalCard({ goal, steps, area, current }: { goal: Goal; steps: Step[]; a
       <button className="row" style={{ alignItems: 'flex-start', textAlign: 'left' }} onClick={() => setOpen(!open)} aria-expanded={open}>
         <div className="grow stack" style={{ gap: 4 }}>
           <span className="h3">{goal.title}</span>
-          {goal.done_definition && <span className="caption muted">Pronto quando: {goal.done_definition}</span>}
+          {goal.done_definition && <span className="caption muted">{/^TER /.test(goal.done_definition) ? goal.done_definition : `Pronto quando: ${goal.done_definition}`}</span>}
         </div>
         <AreaTag area={area} />
       </button>
@@ -345,24 +349,15 @@ function GoalCard({ goal, steps, area, current }: { goal: Goal; steps: Step[]; a
 }
 
 function GoalSheet({ open, onClose, cycle, areas, position, areaId }: { open: boolean; onClose: () => void; cycle: Cycle; areas: Area[]; position: number; areaId?: string }) {
-  const [title, setTitle] = useState('')
-  const [def, setDef] = useState('')
-  const [area, setArea] = useState(areaId ?? '')
-  return (
-    <Sheet open={open} onClose={onClose} title="Nova meta" labelledBy="goal-sheet">
-      <form className="stack" onSubmit={async (e) => { e.preventDefault(); if (!title.trim()) return
-        await insert<Goal>('goals', { cycle_id: cycle.id, title: title.trim(), done_definition: def.trim() || null, area_id: area || null, kind: 'project', position })
-        setTitle(''); setDef(''); onClose() }}>
-        <label className="field"><span>Meta</span><input className="input" autoFocus value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></label>
-        <label className="field"><span>Está pronta quando…</span><input className="input" value={def} maxLength={500} onChange={(e) => setDef(e.target.value)} /></label>
-        <label className="field"><span>Área</span>
-          <select className="input" value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">Sem área</option>{areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select></label>
-        <button className="btn primary" disabled={!title.trim()}>Criar meta</button>
-      </form>
-    </Sheet>
-  )
+  const { rows: allSteps } = useRows<Step>('steps')
+  const { rows: cg } = useRows<Goal>('goals', { eq: { cycle_id: cycle.id } })
+  const steps = allSteps.filter((s) => cg.some((g) => g.id === s.goal_id))
+  const { rows: refl } = useRows<Reflection>('reflections', { eq: { kind: 'reset' } })
+  if (!open) return null
+  // inspiração: as melhorias que você escreveu no ritual do trimestre
+  const insp = (() => { try { const st = JSON.parse(refl.find((r) => r.prompt === 'ritual-trimestre')?.answers[0] ?? '{}'); return Object.values(st.improve ?? {}).flat().filter(Boolean) as string[] } catch { return [] } })()
+  const now = weekOf(cycle)
+  return <GoalWizard cycleId={cycle.id} areas={areas} existing={steps} position={position} areaId={areaId} inspiration={insp} current={Math.min(Math.max(now, 1), EXEC_WEEKS)} onDone={onClose} onCancel={onClose} />
 }
 
 function VisionSheet({ open, onClose, cycle }: { open: boolean; onClose: () => void; cycle: Cycle }) {

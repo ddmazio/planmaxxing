@@ -12,7 +12,9 @@ export function newCycleDates(start: string) {
 
 /** O ciclo em curso: o mais recente que não foi encerrado. */
 export function currentCycle(cycles: Cycle[]) {
-  return [...cycles].filter((c) => c.status !== 'closed').sort((a, b) => (a.starts_on < b.starts_on ? 1 : -1))[0] ?? null
+  const open = [...cycles].filter((c) => c.status !== 'closed').sort((a, b) => (a.starts_on < b.starts_on ? 1 : -1))
+  // um ciclo ainda em planejamento (ritual do trimestre em andamento) não toma o lugar do que está acontecendo
+  return open.find((c) => c.status !== 'planning') ?? open[0] ?? null
 }
 
 /** Semana do ciclo numa data: 0 se ainda não começou, 14 se já acabou. */

@@ -22,6 +22,7 @@ import { Habito } from './pages/Habito'
 import { Privacidade } from './pages/Privacidade'
 import { AreaPage, Ciclo } from './pages/Ciclo'
 import { Ritual } from './pages/Semana'
+import { Trimestre } from './pages/Trimestre'
 import { DEMO } from './lib/db'
 
 applyTheme(savedTheme())
@@ -65,6 +66,7 @@ function Gate() {
         <Route path="financas" element={<Financas />} />
         <Route path="ciclo" element={<Ciclo />} />
         <Route path="ciclo/ritual" element={<Ritual />} />
+        <Route path="ciclo/trimestre" element={<Trimestre />} />
         <Route path="ciclo/area/:id" element={<AreaPage />} />
         <Route path="habito/:id" element={<Habito />} />
         <Route path="reflexoes" element={<Reflexoes />} />

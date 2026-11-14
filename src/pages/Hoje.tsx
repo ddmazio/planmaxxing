@@ -153,7 +153,7 @@ export function Hoje() {
                     )
                   })}
                 </div>
-              ) : <Empty>{inExec ? <>Nenhum passo planejado para esta semana. <Link className="link" to="/ciclo/ritual">Fazer o ritual</Link></> : 'Fora das 12 semanas de execução.'}</Empty>}
+              ) : <Empty>{inExec ? <>Nenhum passo planejado para esta semana. <Link className="link" to="/ciclo/ritual">Fazer o ritual</Link></> : (week === 0 ? `O ciclo começa em ${fmt(fromYmd(cycle.starts_on), "d 'de' MMM")}. Os passos da semana 1 aparecem aqui.` : 'Fora das 12 semanas de execução.')}</Empty>}
             </>
           )}
         </div>
