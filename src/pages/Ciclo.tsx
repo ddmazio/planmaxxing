@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { insert, remove, removeWhere, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
@@ -383,99 +383,6 @@ function VisionSheet({ open, onClose, cycle }: { open: boolean; onClose: () => v
 }
 
 // ---------------------------------------------------------------- ritual semanal em 3 partes
-const QUESTIONS = ['O que funcionou na semana passada?', 'O que travou, e o que muda agora?', 'Qual é o passo mais importante desta semana?', 'Como você quer se sentir no domingo?']
-
-export function Ritual() {
-  const { cycle, goals, steps, areas, loading } = useCycle()
-  const nav = useNavigate()
-  const { toast } = useOutletContext<ShellCtx>()
-  const [params] = useSearchParams()
-  const now = cycle ? Math.min(Math.max(weekOf(cycle), 1), TOTAL_WEEKS) : 1
-  const week = Number(params.get('semana')) || now
-  const { rows: refl } = useRows<Reflection>('reflections', cycle ? { eq: { cycle_id: cycle.id, week } } : undefined, !!cycle)
-  const existing = refl.find((r) => r.kind === 'review')
-  const [answers, setAnswers] = useState<string[] | null>(null)
-  const [newStep, setNewStep] = useState({ goal: '', title: '' })
-  const vals = answers ?? existing?.answers ?? ['', '', '', '']
-
-  if (loading) return <div className="page"><p className="muted">Carregando…</p></div>
-  if (!cycle) return <div className="page"><PageHeader title="Ritual da semana" /><Empty>Crie um ciclo primeiro. <Link className="link" to="/ciclo">Criar ciclo</Link></Empty></div>
-
-  const last = steps.filter((s) => s.week === week - 1)
-  const lastScore = score(last)
-  const pending = last.filter((s) => !s.done_at)
-  const thisWeek = steps.filter((s) => s.week === week)
-  const set = (i: number, v: string) => { const n = [...vals]; n[i] = v; setAnswers(n) }
-
-  async function save() {
-    const payload = { answers: vals.map((v) => v.trim()), score: lastScore }
-    if (existing) await update<Reflection>('reflections', existing.id, payload)
-    else await insert<Reflection>('reflections', { cycle_id: cycle!.id, kind: 'review', week, ...payload })
-    toast('Ritual guardado. Boa semana!')
-    nav('/ciclo')
-  }
-
-  return (
-    <div className="page">
-      <PageHeader eyebrow={`${cycle.name} · semana ${week}`} title="Ritual da semana" right={<Link className="btn ghost small" to="/ciclo">Fechar</Link>} />
-
-      <section className="stack">
-        <div className="row"><span className="ritual-num">1</span><h2 className="h2">Olhar para trás</h2></div>
-        {week > 1 ? (
-          <div className="card row between">
-            <div className="stack" style={{ gap: 2 }}><span className="mono muted">Semana {week - 1}</span><span>{last.length ? `${last.length - pending.length} de ${last.length} passos feitos` : 'Nenhum passo planejado'}</span></div>
-            <span className="big" style={{ fontSize: 36 }}>{lastScore == null ? '–' : `${lastScore}%`}</span>
-          </div>
-        ) : <div className="card soft caption">Primeira semana do ciclo: nada para olhar ainda. Comece pelo plano.</div>}
-        <label className="field"><span>{QUESTIONS[0]}</span><textarea className="input" rows={2} maxLength={1000} value={vals[0]} onChange={(e) => set(0, e.target.value)} /></label>
-        <label className="field"><span>{QUESTIONS[1]}</span><textarea className="input" rows={2} maxLength={1000} value={vals[1]} onChange={(e) => set(1, e.target.value)} /></label>
-      </section>
-
-      <section className="stack">
-        <div className="row"><span className="ritual-num">2</span><h2 className="h2">Planejar a semana</h2></div>
-        {pending.length > 0 && (
-          <div className="card stack" style={{ gap: 8 }}>
-            <span className="caption muted">Ficaram da semana passada:</span>
-            {pending.map((s) => (
-              <div key={s.id} className="row">
-                <span className="grow">{s.title}</span>
-                <button className="btn secondary small" onClick={() => update<Step>('steps', s.id, { week })}>Trazer</button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="card flush list">
-          {thisWeek.map((s) => (
-            <div key={s.id} className="list-row">
-              <Check done={!!s.done_at} onToggle={() => toggleStep(s)} label={`Concluir ${s.title}`} />
-              <span className={'grow' + (s.done_at ? ' done-text' : '')}>{s.title}</span>
-              <AreaTag area={areas.find((a) => a.id === goals.find((g) => g.id === s.goal_id)?.area_id)} />
-            </div>
-          ))}
-          {goals.length ? (
-            <form className="list-row" style={{ flexWrap: 'wrap' }} onSubmit={async (e) => { e.preventDefault(); const g = newStep.goal || goals[0].id; const t = newStep.title.trim(); if (!t) return; setNewStep({ ...newStep, title: '' })
-              await insert<Step>('steps', { goal_id: g, title: t, week, position: thisWeek.length }) }}>
-              <input className="input grow" style={{ minWidth: 180 }} placeholder="Passo para esta semana" value={newStep.title} maxLength={200} onChange={(e) => setNewStep({ ...newStep, title: e.target.value })} aria-label="Novo passo" />
-              <select className="input" style={{ width: 'auto', maxWidth: 200 }} value={newStep.goal} onChange={(e) => setNewStep({ ...newStep, goal: e.target.value })} aria-label="Meta">
-                {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
-              </select>
-              <button className="icon-btn ink" aria-label="Adicionar passo" disabled={!newStep.title.trim()}><Icon name="plus" size={18} /></button>
-            </form>
-          ) : <div className="list-row caption muted">Crie uma meta no Ciclo para planejar passos.</div>}
-        </div>
-      </section>
-
-      <section className="stack">
-        <div className="row"><span className="ritual-num">3</span><h2 className="h2">Compromisso</h2></div>
-        <label className="field"><span>{QUESTIONS[2]}</span><input className="input" maxLength={300} value={vals[2]} onChange={(e) => set(2, e.target.value)} /></label>
-        <label className="field"><span>{QUESTIONS[3]}</span><input className="input" maxLength={300} value={vals[3]} onChange={(e) => set(3, e.target.value)} /></label>
-      </section>
-
-      <button className="btn primary block" onClick={save}>{existing ? 'Guardar alterações' : 'Fechar o ritual'}</button>
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------- página de uma área
 export function AreaPage() {
   const { id } = useParams()

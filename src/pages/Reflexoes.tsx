@@ -28,10 +28,10 @@ export function Reflexoes() {
     if (!c) return []
     const [worked, stuck, main] = r.answers.map((a) => a?.trim() ?? '')
     const date = weekStartOf(c, r.week!)
-    const body = [worked && `Funcionou: ${worked}`, stuck && `Travou: ${stuck}`].filter(Boolean).join(' ')
+    const body = [stuck && `Pesou: ${stuck}.`, main && `Intenção: ${main}.`].filter(Boolean).join(' ')
     return [{
       key: r.id, kind: 'CHECK-IN' as const, when: `semana ${r.week} · ${fmt(date, 'd MMM')}`, sort: date.toISOString(), score: r.score,
-      title: r.title || firstSentence(main || worked || 'Ritual da semana'), body: body || null,
+      title: r.title || firstSentence(worked || main || 'Ritual da semana'), body: body || null,
       to: c.id === cur?.id ? `/ciclo/ritual?semana=${r.week}` : undefined,
     }]
   })

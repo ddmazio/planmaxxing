@@ -20,7 +20,8 @@ import { AceitarConvite, Grupo } from './pages/Grupo'
 import { Reflexoes } from './pages/Reflexoes'
 import { Habito } from './pages/Habito'
 import { Privacidade } from './pages/Privacidade'
-import { AreaPage, Ciclo, Ritual } from './pages/Ciclo'
+import { AreaPage, Ciclo } from './pages/Ciclo'
+import { Ritual } from './pages/Semana'
 import { DEMO } from './lib/db'
 
 applyTheme(savedTheme())
