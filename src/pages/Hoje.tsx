@@ -196,7 +196,7 @@ export function Hoje() {
                   <div key={h.id} className="list-row">
                     <Check done={!!log} label={log ? `Desmarcar ${h.title}` : `Marcar ${h.title}`}
                       onToggle={() => (log ? remove('habit_logs', log.id) : insert<HabitLog>('habit_logs', { habit_id: h.id, day: today }))} />
-                    <span className={'grow' + (log ? ' done-text' : '')}>{h.title}</span>
+                    <Link to={`/habito/${h.id}`} className={'grow' + (log ? ' done-text' : '')}>{h.title}</Link>
                   </div>
                 )
               })}

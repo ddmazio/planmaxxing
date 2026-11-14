@@ -3,10 +3,11 @@ import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 
 import { insert, remove, removeWhere, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
-import { fmt, fromYmd, todayYmd, weekStart, ymd } from '../lib/dates'
+import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/dates'
 import { EXEC_WEEKS, TOTAL_WEEKS, currentCycle, daysUntil, newCycleDates, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
-import type { Area, Cycle, Goal, Habit, Reflection, Step } from '../lib/types'
-import { AreaTag, Check, Empty, SectionHead, Sheet, Toggle } from '../components/ui'
+import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, Step, Task } from '../lib/types'
+import { TaskRow } from '../components/TaskRow'
+import { AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
 
@@ -141,6 +142,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
   const [editVision, setEditVision] = useState(false)
   const nav = useNavigate()
   const { rows: reflections } = useRows<Reflection>('reflections', { eq: { cycle_id: cycle.id }, order: { column: 'week', ascending: false } })
+  const { rows: habits } = useRows<Habit>('habits', { eq: { archived: false } })
 
   const weekSteps = steps.filter((s) => s.week === week)
   const pastSteps = steps.filter((s) => s.week < execNow)
@@ -164,12 +166,18 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
 
   return (
     <div className="page wide">
-      <PageHeader eyebrow={cycle.name} title={
-        now === 0 ? `Começa em ${daysUntil(cycle)} dia${daysUntil(cycle) === 1 ? '' : 's'}`
-          : ended ? 'Ciclo terminado'
-          : now === TOTAL_WEEKS ? 'Semana de revisão'
-          : `Semana ${now} de ${EXEC_WEEKS}`}
+      <PageHeader eyebrow={`${cycle.name} · ${
+        now === 0 ? `começa em ${daysUntil(cycle)} dia${daysUntil(cycle) === 1 ? '' : 's'}`
+          : ended ? 'terminado'
+          : now === TOTAL_WEEKS ? 'semana de revisão'
+          : `semana ${now} de ${EXEC_WEEKS}`}`} title="Plano do ciclo"
         right={<div className="row" style={{ gap: 8 }}><Link className="btn secondary small" to="/grupo"><Icon name="users" size={16} />Grupo</Link><Link className="btn primary small" to="/ciclo/ritual"><Icon name="sparkle" size={16} />Ritual da semana</Link></div>} />
+
+      <div className="plan-stats">
+        <div><span className="big">{goals.length}</span><span className="caption muted">meta{goals.length === 1 ? '' : 's'}</span></div>
+        <div><span className="big">{steps.length}</span><span className="caption muted">passo{steps.length === 1 ? '' : 's'}</span></div>
+        <div><span className="big">{habits.length}</span><span className="caption muted">hábito{habits.length === 1 ? '' : 's'}</span></div>
+      </div>
 
       <div className="weeks" aria-label={`Semana ${now} de ${TOTAL_WEEKS}`}>
         {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map((w) => (
@@ -225,6 +233,17 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
           <SectionHead title="Metas" action={<button className="btn secondary small" onClick={() => setNewGoal(true)}><Icon name="plus" size={14} />Meta</button>} />
           {goals.length ? goals.map((g) => <GoalCard key={g.id} goal={g} steps={steps.filter((s) => s.goal_id === g.id)} area={areaOf(g.area_id)} current={execNow} />)
             : <Empty>Sem metas ainda. Escolha 1 a 3 para este ciclo.</Empty>}
+
+          <SectionHead title="Hábitos" action={<span className="caption muted">abra para ver o calendário</span>} />
+          {habits.length ? (
+            <div className="card flush list">
+              {habits.map((h) => (
+                <Link key={h.id} to={`/habito/${h.id}`} className="list-row">
+                  <span className="grow">{h.title}</span><AreaTag area={areaOf(h.area_id)} /><Icon name="chevron" size={16} className="faint" />
+                </Link>
+              ))}
+            </div>
+          ) : <Empty>Sem hábitos. Escreva no + algo como “ler 20 min todo dia”.</Empty>}
 
           <SectionHead title="Quem você está se tornando" action={<button className="caption muted" onClick={() => setEditVision(true)}>editar</button>} />
           {cycle.words.length || cycle.who_is_she.length ? (
@@ -460,55 +479,188 @@ export function Ritual() {
 // ---------------------------------------------------------------- página de uma área
 export function AreaPage() {
   const { id } = useParams()
+  const { openQuick } = useOutletContext<ShellCtx>()
   const { cycle, goals, steps, areas, loading } = useCycle()
+  const today = todayYmd()
+  const now = new Date()
+  const weekAgo = ymd(addDays(now, -6))
+  const ws = weekStart(now)
   const { rows: habits } = useRows<Habit>('habits', { eq: { area_id: id ?? '', archived: false } }, !!id)
+  const { rows: logs } = useRows<HabitLog>('habit_logs', { gte: { day: weekAgo } })
+  const { rows: tasks } = useRows<Task>('tasks', { eq: { area_id: id ?? '', completed_at: null } }, !!id)
+  const { rows: lists } = useRows<List>('lists')
+  const { rows: events } = useRows<CalEvent>('events', { eq: { area_id: id ?? '' }, gte: { starts_at: toIso(ymd(ws)) }, lt: { starts_at: toIso(ymd(addDays(ws, 7))) }, order: { column: 'starts_at' } }, !!id)
   const [newGoal, setNewGoal] = useState(false)
+  const [editing, setEditing] = useState(false)
   const [habit, setHabit] = useState('')
+  const [task, setTask] = useState('')
+  const [step, setStep] = useState('')
   const area = areas.find((a) => a.id === id)
   if (!area) return <div className="page"><p className="muted">{loading ? 'Carregando…' : 'Área não encontrada.'}</p></div>
-  const set = (patch: Partial<Area>) => update<Area>('areas', area.id, patch)
   const areaGoals = goals.filter((g) => g.area_id === area.id)
+  const focus = areaGoals.length > 0
   const current = cycle ? Math.min(Math.max(weekOf(cycle), 1), EXEC_WEEKS) : 1
+  const inExec = !!cycle && weekOf(cycle) >= 1 && weekOf(cycle) <= EXEC_WEEKS
+  const goalIds = new Set(areaGoals.map((g) => g.id))
+  const weekSteps = inExec ? steps.filter((s) => goalIds.has(s.goal_id) && s.week === current) : []
+  const last7 = Array.from({ length: 7 }, (_, i) => ymd(addDays(now, i - 6)))
+  const fmtScore = (v: number | null) => (v == null ? '–' : String(Number(v)))
+  const doneDay = (d: string | null) => (d ? fmt(new Date(d), 'EEE') : '')
+
+  const addStep = async (e: React.FormEvent) => {
+    e.preventDefault(); const t = step.trim(); if (!t || !areaGoals[0]) return; setStep('')
+    await insert<Step>('steps', { goal_id: areaGoals[0].id, title: t, week: current, position: steps.length })
+  }
+  const addTask = async (e: React.FormEvent) => {
+    e.preventDefault(); const t = task.trim(); if (!t) return; setTask('')
+    await insert<Task>('tasks', { title: t, area_id: area.id, list_id: null, important: false, position: 0 })
+  }
+  const addHabit = async (e: React.FormEvent) => {
+    e.preventDefault(); const t = habit.trim(); if (!t) return; setHabit('')
+    await insert<Habit>('habits', { title: t, area_id: area.id, days: [0, 1, 2, 3, 4, 5, 6], archived: false })
+  }
 
   return (
-    <div className="page" key={area.id}>
+    <div className="page wide" key={area.id}>
       <header className="card stack" style={{ background: `var(--${area.color}-bg)`, color: `var(--${area.color}-fg)`, gap: 8 }}>
-        <div className="row between"><span className="mono">Área da vida</span>
-          {!area.is_fixed && <span className="row caption" style={{ gap: 8 }}>Em foco <Toggle label="Em foco neste ciclo" on={area.focus} onChange={(v) => set({ focus: v })} /></span>}
+        <div className="row between" style={{ alignItems: 'flex-start', flexWrap: 'wrap', rowGap: 12 }}>
+          <div className="stack" style={{ gap: 4 }}>
+            <span className="mono" style={{ textTransform: 'uppercase' }}>Área da vida · {area.is_fixed ? 'sempre ligada' : focus ? 'foco neste ciclo' : 'manutenção'}</span>
+            <h1 className="h1">{area.name}</h1>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="area-score" onClick={() => setEditing(true)} aria-label="Editar notas da área">
+              <div><span className="big">{fmtScore(area.score_now)}</span><span className="caption">hoje</span></div>
+              <div><span className="big">{fmtScore(area.score_goal)}</span><span className="caption">quero</span></div>
+            </button>
+          </div>
         </div>
-        <h1 className="h1">{area.name}</h1>
       </header>
 
-      <div className="card stack">
-        <span className="h3">Como está</span>
-        <ScoreSlider label="Hoje" value={area.score_now} onChange={(v) => set({ score_now: v })} />
-        <ScoreSlider label="Onde quero chegar" value={area.score_goal} onChange={(v) => set({ score_goal: v })} />
+      <div className="grid2">
+        <div className="stack">
+          {!cycle ? <Empty>Sem ciclo em curso. <Link className="link" to="/ciclo">Criar ciclo</Link></Empty>
+            : focus ? areaGoals.map((g) => {
+              const gs = steps.filter((s) => s.goal_id === g.id)
+              const done = gs.filter((s) => s.done_at).length
+              const pct = gs.length ? Math.round((done / gs.length) * 100) : 0
+              return (
+                <div key={g.id} className="card ink stack" style={{ gap: 10 }}>
+                  <span className="mono" style={{ opacity: 0.6 }}>META DO CICLO</span>
+                  <span className="h3">{g.title}</span>
+                  {g.done_definition && <span className="caption" style={{ opacity: 0.7 }}>{g.done_definition}</span>}
+                  <div className="row between caption"><span style={{ opacity: 0.7 }}>{done} de {gs.length} passo{gs.length === 1 ? '' : 's'}</span><span className="medium">{pct}%</span></div>
+                  <div className="bar on-ink"><span style={{ width: `${pct}%` }} /></div>
+                </div>
+              )
+            }) : (
+              <div className="card soft stack" style={{ gap: 6 }}>
+                <span className="mono muted">EM MANUTENÇÃO NESTE CICLO</span>
+                <span>Sem meta agora. Os hábitos seguram a área.</span>
+                {!area.is_fixed && <button className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => setNewGoal(true)}><Icon name="plus" size={14} />Criar uma meta</button>}
+              </div>
+            )}
+          {focus && <button className="caption muted" style={{ alignSelf: 'flex-start' }} onClick={() => setNewGoal(true)}>+ outra meta nesta área</button>}
+        </div>
+
+        <div className="stack">
+          <button className="card stack" style={{ textAlign: 'left', gap: 6 }} onClick={() => setEditing(true)}>
+            <span className="mono muted">POR QUE IMPORTA</span>
+            {area.why ? <span className="serif" style={{ fontSize: 22, lineHeight: '28px' }}>“{area.why}”</span> : <span className="muted">Escreva por que esta área importa para você.</span>}
+          </button>
+          <button className="card stack" style={{ textAlign: 'left', gap: 6 }} onClick={() => setEditing(true)}>
+            <span className="mono muted">O QUE QUERO MELHORAR</span>
+            {area.improve ? <span>{area.improve}</span> : <span className="muted">O que você quer mudar nesta área?</span>}
+          </button>
+        </div>
       </div>
 
-      <label className="field"><span>Por que esta área importa para você</span>
-        <textarea className="input" rows={3} maxLength={2000} defaultValue={area.why ?? ''} onBlur={(e) => e.target.value !== (area.why ?? '') && set({ why: e.target.value || null })} /></label>
-      <label className="field"><span>O que quero melhorar</span>
-        <textarea className="input" rows={3} maxLength={2000} defaultValue={area.improve ?? ''} onBlur={(e) => e.target.value !== (area.improve ?? '') && set({ improve: e.target.value || null })} /></label>
+      <div className="area-cols">
+        {/* passos da semana (área em foco) ou agenda da semana (manutenção) */}
+        {focus ? (
+          <section className="stack">
+            <div className="col-head"><span className="h3">Passos desta semana</span><span className="count">{weekSteps.length}</span></div>
+            <div className="card flush list">
+              {weekSteps.map((s) => (
+                <div key={s.id} className="list-row">
+                  <Check done={!!s.done_at} onToggle={() => toggleStep(s)} label={s.done_at ? `Desmarcar ${s.title}` : `Concluir ${s.title}`} />
+                  <div className="grow stack" style={{ gap: 2 }}>
+                    <span className={s.done_at ? 'done-text' : ''}>{s.title}</span>
+                    {(s.done_at || s.detail) && <span className="caption muted">{s.done_at ? `feito ${doneDay(s.done_at)}` : s.detail}</span>}
+                  </div>
+                </div>
+              ))}
+              {inExec && <form className="list-row" onSubmit={addStep}><Icon name="plus" size={18} className="faint" />
+                <input className="input bare grow" placeholder="Adicionar" value={step} maxLength={200} onChange={(e) => setStep(e.target.value)} aria-label="Novo passo desta semana" /></form>}
+            </div>
+          </section>
+        ) : (
+          <section className="stack">
+            <div className="col-head"><span className="h3">Na agenda esta semana</span><span className="count">{events.length}</span></div>
+            <div className="card flush list">
+              {events.map((e) => (
+                <Link key={e.id} to={`/agenda?evento=${e.id}`} className="list-row">
+                  <div className="grow stack" style={{ gap: 2 }}><span>{e.title}</span>
+                    <span className="caption muted">{fmt(new Date(e.starts_at), e.all_day ? 'EEEE' : "EEEE HH'h'mm").replace(/h00$/, 'h')}</span></div>
+                </Link>
+              ))}
+              <Link className="list-row muted" to={`/agenda?novo=${today}`}><Icon name="plus" size={18} />Adicionar</Link>
+            </div>
+          </section>
+        )}
 
-      <SectionHead title="Metas neste ciclo" action={cycle && <button className="btn secondary small" onClick={() => setNewGoal(true)}><Icon name="plus" size={14} />Meta</button>} />
-      {!cycle ? <Empty>Sem ciclo em curso. <Link className="link" to="/ciclo">Criar ciclo</Link></Empty>
-        : areaGoals.length ? areaGoals.map((g) => <GoalCard key={g.id} goal={g} steps={steps.filter((s) => s.goal_id === g.id)} area={area} current={current} />)
-        : <Empty>Nenhuma meta desta área no ciclo atual.</Empty>}
+        <section className="stack">
+          <div className="col-head"><span className="h3">Tarefas</span><span className="count">{tasks.length}</span></div>
+          <div className="card flush list">
+            {tasks.length === 0 && <div className="list-row caption muted">Nada por enquanto.</div>}
+            {tasks.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={[]} />)}
+            <form className="list-row" onSubmit={addTask}><Icon name="plus" size={18} className="faint" />
+              <input className="input bare grow" placeholder="Adicionar" value={task} maxLength={500} onChange={(e) => setTask(e.target.value)} aria-label="Nova tarefa desta área" /></form>
+          </div>
+        </section>
 
-      <SectionHead title="Hábitos" />
-      <div className="card flush list">
-        {habits.map((h) => (
-          <div key={h.id} className="list-row"><span className="grow">{h.title}</span>
-            <button aria-label={`Arquivar ${h.title}`} className="faint" onClick={() => update<Habit>('habits', h.id, { archived: true })}><Icon name="x" size={16} /></button></div>
-        ))}
-        <form className="list-row" onSubmit={async (e) => { e.preventDefault(); const t = habit.trim(); if (!t) return; setHabit(''); await insert<Habit>('habits', { title: t, area_id: area.id, days: [0, 1, 2, 3, 4, 5, 6] }) }}>
-          <Icon name="plus" size={18} className="faint" />
-          <input className="input bare grow" placeholder="Novo hábito diário" value={habit} maxLength={120} onChange={(e) => setHabit(e.target.value)} aria-label="Novo hábito" />
-        </form>
+        <section className="stack">
+          <div className="col-head"><span className="h3">Hábitos</span><span className="count">{habits.length}</span></div>
+          <div className="card flush list">
+            {habits.length === 0 && <div className="list-row caption muted">Nenhum hábito aqui ainda. Hábitos pequenos ajudam a meta a andar sozinha.</div>}
+            {habits.map((h) => {
+              const due = last7.filter((d) => h.days.includes(fromYmd(d).getDay()))
+              const hit = logs.filter((l) => l.habit_id === h.id && due.includes(l.day)).length
+              return (
+                <Link key={h.id} to={`/habito/${h.id}`} className="list-row">
+                  <div className="grow stack" style={{ gap: 2 }}><span>{h.title}</span><span className="caption muted">{hit} de {due.length} dias</span></div>
+                  <Icon name="chevron" size={16} className="faint" />
+                </Link>
+              )
+            })}
+            <form className="list-row" onSubmit={addHabit}><Icon name="plus" size={18} className="faint" />
+              <input className="input bare grow" placeholder="Adicionar" value={habit} maxLength={120} onChange={(e) => setHabit(e.target.value)} aria-label="Novo hábito" /></form>
+          </div>
+        </section>
       </div>
+      <button className="caption muted" style={{ alignSelf: 'flex-start' }} onClick={openQuick}>Ou use o + para escrever do seu jeito</button>
 
+      <Sheet open={editing} onClose={() => setEditing(false)} title={area.name}>
+        <AreaEdit area={area} onDone={() => setEditing(false)} />
+      </Sheet>
       {cycle && <GoalSheet open={newGoal} onClose={() => setNewGoal(false)} cycle={cycle} areas={areas} position={goals.length} areaId={area.id} />}
     </div>
+  )
+}
+
+function AreaEdit({ area, onDone }: { area: Area; onDone: () => void }) {
+  const set = (patch: Partial<Area>) => update<Area>('areas', area.id, patch)
+  const [why, setWhy] = useState(area.why ?? '')
+  const [improve, setImprove] = useState(area.improve ?? '')
+  return (
+    <form className="stack" onSubmit={async (e) => { e.preventDefault(); await set({ why: why.trim() || null, improve: improve.trim() || null }); onDone() }}>
+      <span className="mono muted">Nota de 0 a 10</span>
+      <ScoreSlider label="Hoje" value={area.score_now} onChange={(v) => set({ score_now: v })} />
+      <ScoreSlider label="Onde quero chegar" value={area.score_goal} onChange={(v) => set({ score_goal: v })} />
+      <label className="field"><span>Por que esta área importa</span><textarea className="input" rows={3} maxLength={2000} value={why} onChange={(e) => setWhy(e.target.value)} /></label>
+      <label className="field"><span>O que quero melhorar</span><textarea className="input" rows={3} maxLength={2000} value={improve} onChange={(e) => setImprove(e.target.value)} /></label>
+      <button className="btn primary block">Guardar</button>
+    </form>
   )
 }
 

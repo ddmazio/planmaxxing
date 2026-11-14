@@ -38,7 +38,7 @@ export interface CalEvent extends Owned {
   external_id?: string | null
 }
 
-export interface Habit extends Owned { area_id: string | null; title: string; days: number[]; archived: boolean }
+export interface Habit extends Owned { area_id: string | null; title: string; days: number[]; archived: boolean; reminder_time?: string | null }
 export interface HabitLog extends Owned { habit_id: string; day: string }
 
 export interface Expense extends Owned {
