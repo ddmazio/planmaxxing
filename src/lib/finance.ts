@@ -4,8 +4,26 @@ import type { BudgetRule, Expense, Income, Subscription } from './types'
 
 export type Cat = 'needs' | 'wants' | 'savings'
 export const CATS: Cat[] = ['needs', 'wants', 'savings']
-export const CAT_NAME: Record<Cat, string> = { needs: 'Essenciais', wants: 'Desejos', savings: 'Futuro' }
-export const CAT_HINT: Record<Cat, string> = { needs: 'casa, contas, mercado, transporte', wants: 'lazer, roupas, saídas, assinaturas', savings: 'poupança, potes, investimentos' }
+export const CAT_NAME: Record<Cat, string> = { needs: 'Necessidades', wants: 'Desejos', savings: 'Economias' }
+/** No singular, para o tipo de cada lançamento. */
+export const CAT_ONE: Record<Cat, string> = { needs: 'Necessidade', wants: 'Desejo', savings: 'Economia' }
+export const CAT_HINT: Record<Cat, string> = { needs: 'casa, contas, transporte, mínimo das dívidas', wants: 'restaurantes, streaming, compras, presentes', savings: 'reserva, investimentos, pagar dívidas mais rápido' }
+
+/** Palavras que costumam indicar o tipo do gasto (para a sugestão ao lançar). */
+const HINTS: [Cat, string, RegExp][] = [
+  ['savings', 'reserva', /reserva|poupan|invest|emerg|guardar|pote|tesouro|ppr/],
+  ['needs', 'casa e contas', /renda de casa|aluguel|condom|luz|água|agua|gás|gas\b|internet|telem|celular|seguro|imposto|irs/],
+  ['needs', 'mercado', /supermerc|mercado|mercearia|continente|pingo doce|lidl|aldi|minipreço|farm[aá]c/],
+  ['needs', 'transporte', /passe|navegante|metro|comboio|autocarro|ônibus|onibus|combust|gasolina|portagem/],
+  ['wants', 'restaurantes', /restaur|almo[cç]o|jantar|caf[eé]|lanche|bar\b|pizza|sushi|ifood|uber eats|glovo|bolt food/],
+  ['wants', 'streaming', /streaming|netflix|spotify|disney|hbo|max\b|prime|youtube|apple tv/],
+  ['wants', 'compras e presentes', /compra|roupa|sapato|presente|zara|amazon|shein|livro|cinema|show|concerto|viagem/],
+]
+export function suggestCat(item: string): { cat: Cat; why: string } | null {
+  const t = item.toLowerCase()
+  for (const [cat, why, re] of HINTS) if (re.test(t)) return { cat, why }
+  return null
+}
 export const CAT_COLOR: Record<Cat, string> = { needs: 'estudos', wants: 'relacoes', savings: 'saude' }
 export const DEFAULT_RULE: BudgetRule = { needs_pct: 50, wants_pct: 30, savings_pct: 20 }
 
