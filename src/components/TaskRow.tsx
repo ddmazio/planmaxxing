@@ -6,7 +6,8 @@ import type { Area, List, Task } from '../lib/types'
 import { Icon } from './Icon'
 import { AreaTag, Check } from './ui'
 
-export function TaskRow({ task, lists, areas }: { task: Task; lists: List[]; areas: Area[] }) {
+/** compact: no Hoje, a data de hoje não se repete (fica só a hora, como no Figma: “Casa · 18:00”). */
+export function TaskRow({ task, lists, areas, compact }: { task: Task; lists: List[]; areas: Area[]; compact?: boolean }) {
   const nav = useNavigate()
   const list = lists.find((l) => l.id === task.list_id)
   const area = areas.find((a) => a.id === task.area_id)
@@ -14,7 +15,8 @@ export function TaskRow({ task, lists, areas }: { task: Task; lists: List[]; are
   const late = task.due_on && task.due_on < today && !task.completed_at
   const meta = [
     list?.name,
-    task.due_on && (task.due_on === today ? 'hoje' : fmt(fromYmd(task.due_on), 'EEE, d MMM')) + (task.due_time ? ` ${task.due_time.slice(0, 5)}` : ''),
+    compact && task.due_on === today ? task.due_time?.slice(0, 5)
+      : task.due_on && (task.due_on === today ? 'hoje' : fmt(fromYmd(task.due_on), 'EEE, d MMM')) + (task.due_time ? ` ${task.due_time.slice(0, 5)}` : ''),
   ].filter(Boolean)
   return (
     <div className="list-row" role="button" tabIndex={0} onClick={() => nav(`/tarefa/${task.id}`)} onKeyDown={(e) => { if (e.key === 'Enter') nav(`/tarefa/${task.id}`) }}>

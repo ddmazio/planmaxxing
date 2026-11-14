@@ -27,6 +27,8 @@ export function useCycle() {
 const toggleStep = (s: Step) => update<Step>('steps', s.id, { done_at: s.done_at ? null : new Date().toISOString() })
 
 const splitList = (s: string) => s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean)
+/** Who is she: uma frase por linha (vírgula faz parte da frase). */
+const splitLines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean)
 
 // ---------------------------------------------------------------- página /ciclo
 export function Ciclo() {
@@ -54,7 +56,7 @@ function NovoCiclo() {
   async function create() {
     setBusy(true)
     try {
-      const c = await insert<Cycle>('cycles', { name: name.trim(), ...dates, status: 'active', words: splitList(words).slice(0, 10), who_is_she: splitList(who).slice(0, 20) })
+      const c = await insert<Cycle>('cycles', { name: name.trim(), ...dates, status: 'active', words: splitList(words).slice(0, 10), who_is_she: splitLines(who).slice(0, 20) })
       for (const [i, g] of goals.entries()) await insert<Goal>('goals', { cycle_id: c.id, area_id: g.area_id, title: g.title, done_definition: g.done_definition || null, kind: 'project', position: i })
       toast('Ciclo criado. Agora quebre cada meta em passos.')
     } catch (e) {
@@ -232,7 +234,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
             </div>
           ) : <Empty>Escreva as palavras do ciclo e quem você quer ser no fim dele.</Empty>}
 
-          <SectionHead title="Reflexões" />
+          <SectionHead title="Reflexões" action={<Link className="caption muted" to="/reflexoes">todas →</Link>} />
           {reflections.length ? (
             <div className="card flush list">
               {reflections.map((r) => (
@@ -351,7 +353,7 @@ function VisionSheet({ open, onClose, cycle }: { open: boolean; onClose: () => v
   return (
     <Sheet open={open} onClose={onClose} title="Visão do ciclo" labelledBy="vision-sheet">
       <form className="stack" onSubmit={async (e) => { e.preventDefault()
-        await update<Cycle>('cycles', cycle.id, { name: name.trim() || cycle.name, words: splitList(words).slice(0, 10), who_is_she: splitList(who).slice(0, 20) }); onClose() }}>
+        await update<Cycle>('cycles', cycle.id, { name: name.trim() || cycle.name, words: splitList(words).slice(0, 10), who_is_she: splitLines(who).slice(0, 20) }); onClose() }}>
         <label className="field"><span>Nome do ciclo</span><input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} /></label>
         <label className="field"><span>Palavras (separe por vírgula)</span><input className="input" value={words} maxLength={300} onChange={(e) => setWords(e.target.value)} /></label>
         <label className="field"><span>Quem você quer ser (uma frase por linha)</span><textarea className="input" rows={5} value={who} maxLength={2000} onChange={(e) => setWho(e.target.value)} /></label>

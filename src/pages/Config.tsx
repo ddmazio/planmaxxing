@@ -101,13 +101,15 @@ export function Config() {
 // ---------------------------------------------------------------- áreas da vida
 function Areas() {
   const { rows: areas } = useRows<Area>('areas', { order: { column: 'position' } })
+  const loaded = areas.length > 0
+  useEffect(() => { if (loaded && location.hash === '#areas') document.getElementById('areas')?.scrollIntoView({ behavior: 'smooth' }) }, [loaded])
   const [name, setName] = useState('')
   const [color, setColor] = useState<AreaColor>('neutro')
   const active = areas.filter((a) => !a.archived)
   const archived = areas.filter((a) => a.archived)
   return (
     <>
-      <span className="mono muted">Áreas da vida</span>
+      <span className="mono muted" id="areas" style={{ scrollMarginTop: 24 }}>Áreas da vida</span>
       <div className="card flush list">
         {active.map((a) => (
           <div key={a.id} className="list-row" style={{ flexWrap: 'wrap', rowGap: 8 }}>

@@ -17,6 +17,7 @@ import { Agenda } from './pages/Agenda'
 import { Config, applyTheme, savedTheme } from './pages/Config'
 import { Financas } from './pages/Financas'
 import { AceitarConvite, Grupo } from './pages/Grupo'
+import { Reflexoes } from './pages/Reflexoes'
 import { Privacidade } from './pages/Privacidade'
 import { AreaPage, Ciclo, Ritual } from './pages/Ciclo'
 import { DEMO } from './lib/db'
@@ -62,6 +63,7 @@ function Gate() {
         <Route path="ciclo" element={<Ciclo />} />
         <Route path="ciclo/ritual" element={<Ritual />} />
         <Route path="ciclo/area/:id" element={<AreaPage />} />
+        <Route path="reflexoes" element={<Reflexoes />} />
         <Route path="grupo" element={<Grupo />} />
         <Route path="convite/:token" element={<ConviteRoute />} />
         <Route path="config" element={<Config />} />
