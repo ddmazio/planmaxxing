@@ -412,3 +412,34 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
   .sidebar .nav-section:first-child { padding-top: 10px; }
   .side-user { background: var(--bg-muted); border-radius: 14px; box-shadow: none; }
 }
+
+/* Hoje · cartão Agora / Livre, placar e seções que abrem e fecham */
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agora { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 24px; }
+.agora .mono { text-transform: uppercase; letter-spacing: 0.06em; }
+.agora-k { color: var(--lime); }
+.agora-m { color: var(--hero-muted); }
+.agora-t { font-size: 30px; line-height: 34px; }
+.agora-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.agora-bar span { display: block; height: 100%; background: var(--lime); border-radius: 3px; }
+.agora-next { padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.14); gap: 10px; }
+.agora.livre .agora-next { border-top-color: rgba(61, 20, 40, 0.14); }
+.agora.livre .caption { opacity: 0.8; }
+.placar { gap: 14px; border-radius: 24px; box-shadow: inset 0 0 0 1px var(--border); }
+.placar-head { display: flex; align-items: center; gap: 10px; width: 100%; }
+.placar-n { font-size: 34px; line-height: 1; }
+.placar-weeks > .past { background: var(--lime); }
+.placar-weeks > .now { background: var(--ink); box-shadow: none; }
+.placar-q { font-style: italic; font-size: 22px; line-height: 28px; margin: 0; }
+.placar-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.placar-stats > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 14px; background: var(--bg-muted); }
+.mono-n { font-family: var(--font-mono); font-size: 17px; font-weight: 500; }
+.fold-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0; text-align: left; }
+.fold-chev { transform: rotate(90deg); transition: transform .2s; color: var(--text-secondary); flex: none; }
+.fold-chev.open { transform: rotate(-90deg); }
+.fold-sum { display: flex; flex-direction: column; gap: 10px; text-align: left; width: 100%; box-shadow: inset 0 0 0 1px var(--border); }
+.fold-sum.row { flex-direction: row; align-items: center; }
+.dots-stack { display: inline-flex; flex: none; }
+.dots-stack span { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg-surface); margin-right: -4px; }
+.type-pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--r-full); font-size: 12px; color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--border); }
+@media (min-width: 1024px) { .hoje-hero { grid-template-columns: 1.3fr 1fr; align-items: start; } }
