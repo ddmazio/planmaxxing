@@ -1,3 +1,4 @@
+import { Logo } from '../components/Logo'
 import { useState } from 'react'
 import { DEMO } from '../lib/db'
 import { useAuth } from '../lib/auth'
@@ -26,9 +27,9 @@ export function Login() {
   }
 
   return (
-    <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24, background: 'linear-gradient(180deg, var(--lime-soft), var(--bg-canvas) 60%)' }}>
+    <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 24, background: 'linear-gradient(180deg, var(--wash), var(--bg-canvas) 60%)' }}>
       <div className="stack" style={{ width: '100%', maxWidth: 420, gap: 20 }}>
-        <div className="brand" style={{ padding: 0 }}><span className="brand-mark">db</span>Dream Board</div>
+        <div className="brand" style={{ padding: 0 }}><Logo />Twelvefold</div>
         <h1 className="serif" style={{ fontSize: 48, lineHeight: '50px', margin: 0 }}>Um ano cabe em 12 semanas.</h1>
         <p className="muted" style={{ margin: 0 }}>Planeje por ciclos, acompanhe a semana e cresça junto com quem você ama.</p>
         {DEMO ? (

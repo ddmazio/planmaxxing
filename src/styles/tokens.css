@@ -1,59 +1,88 @@
-/* Gerado a partir das variáveis do Figma "MdA" (coleções Color e Dimension). */
+/* Twelvefold · paleta Pílula Ameixa (claro) e Noturno ameixa discreto (escuro).
+   Espelha as variáveis do Figma "MdA" (coleções Color e Dimension).
+   Áreas: -bg é o fundo vivo, -fg é o texto/ícone em cima dele,
+   -ink é a cor da área para usar sozinha sobre o fundo neutro (pontos, barras, ícones). */
 :root {
-  --bg-canvas: #f4f4f1;
-  --bg-surface: #ffffff;
-  --bg-muted: #ecece7;
-  --border: #e6e6e1;
-  --text-primary: #141414;
-  --text-secondary: #6b6b66;
-  --text-tertiary: #a3a39e;
-  --ink: #141414;
-  --on-ink: #ffffff;
-  --lime: #d4f25c;
-  --lime-soft: #eef9c4;
-  --on-lime: #141414;
-  --accent-on-ink: #d4f25c;
-  --danger: #a92e5a;
+  --bg-canvas: #fbf1ee;
+  --bg-surface: #fffdfb;
+  --bg-muted: #f8e9ea;
+  --border: #f2e1e2;
+  --text-primary: #3d1428;
+  --text-secondary: #7a4e62;
+  --text-tertiary: #8e6878;
+  --ink: #5b2140;
+  --on-ink: #ffb3d9;
+  --focus: #5b2140;
+  --lime: #d2f54a;
+  --lime-soft: #f1fbc8;
+  --on-lime: #3d1428;
+  --accent-on-ink: #d2f54a;
+  --danger: #a8264a;
 
-  --trabalho-bg: #e6e0fb; --trabalho-fg: #5b45c9;
-  --estudos-bg: #dcebfa; --estudos-fg: #2262ad;
-  --saude-bg: #d8efe2; --saude-fg: #1f7046;
-  --relacoes-bg: #fadde7; --relacoes-fg: #a92e5a;
-  --financas-bg: #faefc8; --financas-fg: #7a5c0a;
-  --eu-bg: #fbe3d3; --eu-fg: #9c4614;
-  --neutro-bg: #ecece7; --neutro-fg: #6b6b66;
+  --hero-bg: #5b2140; --hero-fg: #fbf1ee; --hero-muted: #e9c3d5;
+  --nav-bg: #5b2140; --nav-fg: #f3d6e3; --nav-icon: #fdf8f6;
+  --toast-bg: #3d1428; --toast-fg: #fbf1ee;
+  --plus-grad: linear-gradient(90deg, #ffb3d9, #fcd232);
+  --wash: #f9dce8;
+
+  --trabalho-bg: #5b2140; --trabalho-fg: #ffb3d9; --trabalho-ink: #5b2140;
+  --estudos-bg: #fcd232; --estudos-fg: #5b2140; --estudos-ink: #a87e00;
+  --saude-bg: #d2f54a; --saude-fg: #5b2140; --saude-ink: #6f8a00;
+  --relacoes-bg: #b4507a; --relacoes-fg: #ffffff; --relacoes-ink: #b4507a;
+  --financas-bg: #00563f; --financas-fg: #d2f54a; --financas-ink: #00563f;
+  --eu-bg: #ffb3d9; --eu-fg: #5b2140; --eu-ink: #c9578b;
+  --neutro-bg: #f8e9ea; --neutro-fg: #7a4e62; --neutro-ink: #7a4e62;
 
   --s4: 4px; --s8: 8px; --s12: 12px; --s16: 16px; --s20: 20px; --s24: 24px; --s32: 32px; --s40: 40px;
   --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-full: 999px;
 
-  --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-sans: 'Familjen Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --font-serif: 'Instrument Serif', Georgia, serif;
-  --shadow-float: 0 12px 40px rgba(20, 20, 20, 0.12), 0 2px 6px rgba(20, 20, 20, 0.06);
+  --shadow-float: 0 12px 40px rgba(61, 20, 40, 0.16), 0 2px 6px rgba(61, 20, 40, 0.08);
   color-scheme: light;
 }
 
+/* o mesmo bloco escuro vale para "seguir o sistema" e para "escuro" escolhido nas Configurações */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg-canvas: #0f0f0e; --bg-surface: #1a1a19; --bg-muted: #242422; --border: #2c2c2a;
-    --text-primary: #f4f4f1; --text-secondary: #a3a39e; --text-tertiary: #6b6b66;
-    --ink: #f4f4f1; --on-ink: #141414; --lime-soft: #2e3519; --accent-on-ink: #4a5a08; --danger: #f1a3be;
-    --trabalho-bg: #2a2540; --trabalho-fg: #b9aef5; --estudos-bg: #1e2c3b; --estudos-fg: #9cc6f2;
-    --saude-bg: #1d3227; --saude-fg: #93d7b0; --relacoes-bg: #3a2129; --relacoes-fg: #f1a3be;
-    --financas-bg: #3a3219; --financas-fg: #ebcb6e; --eu-bg: #3b2a1e; --eu-fg: #f2b48d;
-    --neutro-bg: #242422; --neutro-fg: #a3a39e;
+    --bg-canvas: #181216; --bg-surface: #221a1f; --bg-muted: #2a2027; --border: #352a31;
+    --text-primary: #f6eef0; --text-secondary: #ada0a7; --text-tertiary: #938690;
+    --ink: #6b2850; --on-ink: #f6eef0; --focus: #e07aa6;
+    --lime-soft: #2e3519; --on-lime: #1f2a0a; --accent-on-ink: #d2f54a; --danger: #f28aa8;
+    --hero-bg: #5b2140; --hero-fg: #f6eef0; --hero-muted: #d2a9bd;
+    --nav-bg: #221a1f; --nav-fg: #b8aab2; --nav-icon: #f6eef0;
+    --toast-bg: #f6eef0; --toast-fg: #181216;
+    --plus-grad: linear-gradient(90deg, #fcd232, #d2f54a);
+    --wash: #2c1b26;
+    --trabalho-bg: #7a2e55; --trabalho-fg: #ffd1e6; --trabalho-ink: #d27ba5;
+    --estudos-bg: #fcd232; --estudos-fg: #2a1a0a; --estudos-ink: #fcd232;
+    --saude-bg: #d2f54a; --saude-fg: #1f2a0a; --saude-ink: #d2f54a;
+    --relacoes-bg: #e07aa6; --relacoes-fg: #2a0f1e; --relacoes-ink: #e07aa6;
+    --financas-bg: #1e7a5c; --financas-fg: #d2f54a; --financas-ink: #4cc095;
+    --eu-bg: #ffc9a3; --eu-fg: #4a1e0a; --eu-ink: #ffc9a3;
+    --neutro-bg: #2a2027; --neutro-fg: #ada0a7; --neutro-ink: #ada0a7;
     --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
 }
 :root[data-theme='dark'] {
-  --bg-canvas: #0f0f0e; --bg-surface: #1a1a19; --bg-muted: #242422; --border: #2c2c2a;
-  --text-primary: #f4f4f1; --text-secondary: #a3a39e; --text-tertiary: #6b6b66;
-  --ink: #f4f4f1; --on-ink: #141414; --lime-soft: #2e3519; --accent-on-ink: #4a5a08; --danger: #f1a3be;
-  --trabalho-bg: #2a2540; --trabalho-fg: #b9aef5; --estudos-bg: #1e2c3b; --estudos-fg: #9cc6f2;
-  --saude-bg: #1d3227; --saude-fg: #93d7b0; --relacoes-bg: #3a2129; --relacoes-fg: #f1a3be;
-  --financas-bg: #3a3219; --financas-fg: #ebcb6e; --eu-bg: #3b2a1e; --eu-fg: #f2b48d;
-  --neutro-bg: #242422; --neutro-fg: #a3a39e;
+  --bg-canvas: #181216; --bg-surface: #221a1f; --bg-muted: #2a2027; --border: #352a31;
+  --text-primary: #f6eef0; --text-secondary: #ada0a7; --text-tertiary: #938690;
+  --ink: #6b2850; --on-ink: #f6eef0; --focus: #e07aa6;
+  --lime-soft: #2e3519; --on-lime: #1f2a0a; --accent-on-ink: #d2f54a; --danger: #f28aa8;
+  --hero-bg: #5b2140; --hero-fg: #f6eef0; --hero-muted: #d2a9bd;
+  --nav-bg: #221a1f; --nav-fg: #b8aab2; --nav-icon: #f6eef0;
+  --toast-bg: #f6eef0; --toast-fg: #181216;
+  --plus-grad: linear-gradient(90deg, #fcd232, #d2f54a);
+  --wash: #2c1b26;
+  --trabalho-bg: #7a2e55; --trabalho-fg: #ffd1e6; --trabalho-ink: #d27ba5;
+  --estudos-bg: #fcd232; --estudos-fg: #2a1a0a; --estudos-ink: #fcd232;
+  --saude-bg: #d2f54a; --saude-fg: #1f2a0a; --saude-ink: #d2f54a;
+  --relacoes-bg: #e07aa6; --relacoes-fg: #2a0f1e; --relacoes-ink: #e07aa6;
+  --financas-bg: #1e7a5c; --financas-fg: #d2f54a; --financas-ink: #4cc095;
+  --eu-bg: #ffc9a3; --eu-fg: #4a1e0a; --eu-ink: #ffc9a3;
+  --neutro-bg: #2a2027; --neutro-fg: #ada0a7; --neutro-ink: #ada0a7;
   --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }

@@ -202,7 +202,7 @@ function Rings({ s }: { s: ReturnType<typeof summarize> }) {
         return (
           <g key={c}>
             <circle cx="75" cy="75" r={r} fill="none" stroke={`var(--${CAT_COLOR[c]}-bg)`} strokeWidth="11" />
-            <circle cx="75" cy="75" r={r} fill="none" stroke={over ? 'var(--danger)' : `var(--${CAT_COLOR[c]}-fg)`} strokeWidth="11" strokeLinecap="round"
+            <circle cx="75" cy="75" r={r} fill="none" stroke={over ? 'var(--danger)' : `var(--${CAT_COLOR[c]}-ink)`} strokeWidth="11" strokeLinecap="round"
               strokeDasharray={`${len * Math.min(pct, 1)} ${len}`} transform="rotate(-90 75 75)" style={{ transition: 'stroke-dasharray .5s' }} />
           </g>
         )
@@ -219,7 +219,7 @@ function BudgetRow({ cat, spent, plan, fmt$ }: { cat: Cat; spent: number; plan: 
     : rest < 0 ? `Passou ${fmt$(-rest)}.` : pct >= 85 ? `Quase no limite. Restam ${fmt$(rest)}.` : `Com folga. Restam ${fmt$(rest)}.`
   return (
     <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
-      <span className="dot" style={{ width: 10, height: 10, marginTop: 6, background: `var(--${CAT_COLOR[cat]}-fg)` }} />
+      <span className="dot" style={{ width: 10, height: 10, marginTop: 6, background: `var(--${CAT_COLOR[cat]}-ink)` }} />
       <div className="grow stack" style={{ gap: 2 }}>
         <div className="row between"><span className="medium">{CAT_NAME[cat]}</span><span className="mono muted">{pct}%</span></div>
         <span className="caption">{fmt$(spent)} <span className="muted">de {fmt$(plan)}</span></span>
@@ -399,7 +399,7 @@ function RuleSheet({ open, onClose, rule, income, fmt$ }: { open: boolean; onClo
       <div className="card flush list">
         {CATS.map((c) => (
           <div key={c} className="list-row">
-            <span className="dot" style={{ width: 10, height: 10, background: `var(--${CAT_COLOR[c]}-fg)` }} />
+            <span className="dot" style={{ width: 10, height: 10, background: `var(--${CAT_COLOR[c]}-ink)` }} />
             <div className="grow stack" style={{ gap: 0 }}><span>{CAT_NAME[c]} · {pctOf[c] < 0 ? '–' : `${pctOf[c]}%`}</span><span className="caption muted">{CAT_HINT[c]}</span></div>
             <span className="medium">{income && pctOf[c] >= 0 ? fmt$(Math.round((income * pctOf[c]) / 100)) : ''}</span>
           </div>
@@ -472,7 +472,7 @@ function Pots({ pots, expenses, fmt$ }: { pots: Pot[]; expenses: Expense[]; fmt$
           <div key={p.id} className="card stack" style={{ gap: 8 }}>
             <div className="row between"><span className="medium">{p.name}</span>
               <button className="faint" aria-label={`Apagar pote ${p.name}`} onClick={() => confirm(`Apagar o pote “${p.name}”? Os lançamentos ficam.`) && remove('pots', p.id)}><Icon name="x" size={16} /></button></div>
-            <div className="bar"><span style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--saude-fg)' : undefined }} /></div>
+            <div className="bar"><span style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--saude-ink)' : undefined }} /></div>
             <span className="caption muted">{fmt$(saved)} de {fmt$(p.target_cents)}{pct >= 100 ? ' · conseguiu!' : ''}</span>
           </div>
         )

@@ -21,20 +21,20 @@ export function useCalendars(areas: Area[]) {
     const visible = (e: CalEvent) => byKey.get(calKey(e))?.visible ?? true
     const paint = (e: CalEvent) => {
       const a = areas.find((x) => x.id === e.area_id)
-      if (a) return { fg: `var(--${a.color}-fg)`, bg: `var(--${a.color}-bg)` }
+      if (a) return { fg: `var(--${a.color}-ink)`, bg: `var(--${a.color}-bg)`, on: `var(--${a.color}-fg)` }
       const hex = byKey.get(calKey(e))?.color
-      if (hex) return { fg: hex, bg: `color-mix(in srgb, ${hex} 24%, var(--bg-surface))` }
-      return { fg: 'var(--neutro-fg)', bg: 'var(--neutro-bg)' }
+      if (hex) return { fg: hex, bg: `color-mix(in srgb, ${hex} 24%, var(--bg-surface))`, on: 'var(--text-primary)' }
+      return { fg: 'var(--neutro-ink)', bg: 'var(--neutro-bg)', on: 'var(--neutro-fg)' }
     }
     const local = byKey.get(LOCAL_CAL)
     const list: { key: string; name: string; color: string | null; visible: boolean; row?: Calendar }[] = [
-      { key: LOCAL_CAL, name: 'Dream Board', color: null, visible: local?.visible ?? true, row: local },
+      { key: LOCAL_CAL, name: 'Twelvefold', color: null, visible: local?.visible ?? true, row: local },
       ...cals.filter((c) => c.external_id !== LOCAL_CAL).map((c) => ({ key: c.external_id, name: c.name, color: c.color, visible: c.visible, row: c })),
     ]
     const toggle = async (key: string, v: boolean) => {
       const row = byKey.get(key)
       if (row) await update<Calendar>('calendars', row.id, { visible: v })
-      else if (key === LOCAL_CAL) await insert<Calendar>('calendars', { external_id: LOCAL_CAL, name: 'Dream Board', visible: v, position: -1 })
+      else if (key === LOCAL_CAL) await insert<Calendar>('calendars', { external_id: LOCAL_CAL, name: 'Twelvefold', visible: v, position: -1 })
     }
     return { list, visible, paint, toggle, ready: !error }
   }, [cals, areas, error])

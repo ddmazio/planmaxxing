@@ -14,7 +14,7 @@ import { Icon } from '../components/Icon'
 type View = 'dia' | 'semana' | 'mes'
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 const HOUR_PX = 48
-type Paint = (e: CalEvent) => { fg: string; bg: string }
+type Paint = (e: CalEvent) => { fg: string; bg: string; on: string }
 
 export function Agenda() {
   const [sp, setSp] = useSearchParams()
@@ -138,14 +138,14 @@ function AllDayRow({ days, events, paint, onOpen, cols }: { days: Date[]; events
   const maxLanes = open ? lanes.length : Math.min(lanes.length, 4)
   return (
     <div style={{ display: 'grid', gridTemplateColumns: cols, gridAutoRows: '24px', rowGap: 2, padding: '0 0 6px' }}>
-      <div className="mono faint" style={{ fontSize: 10, paddingTop: 4, gridRow: 1, gridColumn: 1 }}>dia</div>
+      <div className="mono faint" style={{ fontSize: 12, paddingTop: 4, gridRow: 1, gridColumn: 1 }}>dia</div>
       {placed.filter((x) => x.lane < maxLanes).map(({ e, a, b, lane }) => {
         const p = paint(e)
         const startsBefore = new Date(e.starts_at) < dayStart(days[0])
         const endsAfter = new Date(e.ends_at) > addDays(dayStart(days[days.length - 1]), 1)
         return (
           <button key={e.id} onClick={() => onOpen(e.id)} className="caption" title={e.title}
-            style={{ gridColumn: `${a + 2} / ${b + 3}`, gridRow: lane + 1, margin: '0 2px', textAlign: 'left', padding: '2px 8px', background: p.bg, color: 'var(--text-primary)',
+            style={{ gridColumn: `${a + 2} / ${b + 3}`, gridRow: lane + 1, margin: '0 2px', textAlign: 'left', padding: '2px 8px', background: p.bg, color: p.on,
               boxShadow: startsBefore ? undefined : `inset 3px 0 0 ${p.fg}`, borderRadius: `${startsBefore ? 0 : 6}px ${endsAfter ? 0 : 6}px ${endsAfter ? 0 : 6}px ${startsBefore ? 0 : 6}px`,
               overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {startsBefore && '← '}{e.title}{!e.all_day && ` · ${hhmm(e.starts_at)}`}
@@ -210,7 +210,7 @@ function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events
                 const p = paint(e)
                 return (
                   <button key={e.id} onClick={() => onOpen(e.id)} className={'cal-event ' + e.kind} title={`${hhmm(e.starts_at)} ${e.title}`}
-                    style={{ top, height: h, left: `calc(${(col * 100) / n}% + 2px)`, width: `calc(${100 / n}% - 4px)`, ...(e.kind === 'plan' ? { background: p.bg, color: 'var(--text-primary)' } : { ['--ev-fg' as string]: p.fg, background: `color-mix(in srgb, ${p.fg} 10%, var(--bg-surface))` }) }}>
+                    style={{ top, height: h, left: `calc(${(col * 100) / n}% + 2px)`, width: `calc(${100 / n}% - 4px)`, ...(e.kind === 'plan' ? { background: p.bg, color: p.on } : { ['--ev-fg' as string]: p.fg, background: `color-mix(in srgb, ${p.fg} 10%, var(--bg-surface))` }) }}>
                     <div className="medium" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</div>
                     {h > 34 && <div style={{ opacity: 0.75 }}>{hhmm(e.starts_at)}</div>}
                   </button>
@@ -325,7 +325,7 @@ export function ConflictView({ c, left, onDone }: { c: EventConflict; left: numb
   const side = (who: 'app' | 'google', x: ConflictSide, other: ConflictSide) => (
     <div className="card stack conflict-side" style={{ gap: 10 }}>
       <div className="stack" style={{ gap: 0 }}>
-        <span className="mono muted">{who === 'app' ? 'No Dream Board' : 'No Google Agenda'}</span>
+        <span className="mono muted">{who === 'app' ? 'No Twelvefold' : 'No Google Agenda'}</span>
         {who === 'google' && x.updated && <span className="caption muted">mudou {formatDistanceToNow(new Date(x.updated), { addSuffix: true, locale: ptBR })}</span>}
         {who === 'app' && <span className="caption muted">a sua edição aqui</span>}
       </div>

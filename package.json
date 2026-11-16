@@ -1,5 +1,5 @@
 {
-  "name": "dream-board",
+  "name": "twelvefold",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,9 +12,9 @@
     "functions:bundle": "node scripts/bundle-functions.mjs"
   },
   "dependencies": {
-    "@fontsource/geist": "^5.3.0",
-    "@fontsource/geist-mono": "^5.3.0",
+    "@fontsource/familjen-grotesk": "^5.3.0",
     "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@supabase/supabase-js": "^2.119.0",
     "date-fns": "^4.4.0",
     "idb-keyval": "^6.3.0",

@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     const v = await vapid()
     if (body.action === 'test') {
       const subs = await db.get<SubRow[]>(`push_subscriptions?select=id,owner_id,endpoint,p256dh,auth&owner_id=eq.${user.id}`)
-      const sent = await deliver(subs, { title: 'Notificações ligadas ✓', body: 'É assim que os avisos do Dream Board chegam.', url: '/config/notificacoes', tag: 'teste' }, v)
+      const sent = await deliver(subs, { title: 'Notificações ligadas ✓', body: 'É assim que os avisos do Twelvefold chegam.', url: '/config/notificacoes', tag: 'teste' }, v)
       return json(req, 200, { sent, devices: subs.length })
     }
     return json(req, 200, { publicKey: v.publicKey })

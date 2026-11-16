@@ -1,3 +1,4 @@
+import { Logo } from '../components/Logo'
 import { useEffect, useState } from 'react'
 import { DEMO, callFunction, insert, saveRule, update, updateWhere } from '../lib/db'
 import { useAuth } from '../lib/auth'
@@ -115,7 +116,7 @@ export function Onboarding() {
 
         {step === 0 && (
           <div className="stack onb-hero">
-            <span className="brand-mark big-mark">db</span>
+            <Logo size={48} />
             <h1 className="serif onb-title">Um ano cabe em 12 semanas.</h1>
             <p className="muted" style={{ margin: 0, fontSize: 17 }}>Planeje por ciclos, acompanhe a execução da semana e cresça junto com quem você ama.</p>
             <button className="btn primary" style={{ alignSelf: 'flex-start' }} onClick={() => go(1)}>Começar</button>

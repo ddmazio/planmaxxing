@@ -2,12 +2,12 @@
 export function Privacidade() {
   return (
     <div className="page" style={{ maxWidth: 720, margin: '0 auto', padding: '40px 20px' }}>
-      <span className="mono muted">Dream Board</span>
+      <span className="mono muted">Twelvefold</span>
       <h1 className="h1">Política de privacidade</h1>
       <p className="caption muted">Última atualização: 12 de novembro de 2026</p>
 
       <h2 className="h3">O que é</h2>
-      <p>Dream Board é um app pessoal de planejamento (ciclos de 12 semanas, tarefas, agenda e finanças), usado por um pequeno grupo de pessoas próximas. Não há anúncios, venda de dados nem rastreadores.</p>
+      <p>Twelvefold é um app pessoal de planejamento (ciclos de 12 semanas, tarefas, agenda e finanças), usado por um pequeno grupo de pessoas próximas. Não há anúncios, venda de dados nem rastreadores.</p>
 
       <h2 className="h3">Que dados guardamos</h2>
       <p>O que você cria no app: perfil (nome, fuso, moeda), áreas, metas, passos, tarefas, eventos, hábitos, reflexões e lançamentos financeiros. Os dados ficam no Supabase, em servidores na União Europeia (Irlanda), protegidos por regras de acesso por pessoa: ninguém além de você lê os seus dados. Finanças nunca são partilhadas com o grupo.</p>

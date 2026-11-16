@@ -73,7 +73,7 @@ function Lists({ tasks, lists, active, q, setQ }: { tasks: Task[]; lists: List[]
   const count = (k: string) => (k in SMART ? open.filter(SMART[k as SmartKey].filter).length : open.filter((t) => t.list_id === k).length)
   const Row = ({ to, icon, color, label }: { to: string; icon: string; color: string; label: string }) => (
     <Link to={`/tarefas/${to}`} className="list-row" style={{ padding: '11px 12px', borderRadius: 12, background: active === to ? 'var(--bg-muted)' : undefined }}>
-      <span style={{ color: `var(--${color}-fg)` }}><Icon name={icon} /></span><span className="grow">{label}</span><span className="mono muted">{count(to) || ''}</span>
+      <span style={{ color: `var(--${color}-ink)` }}><Icon name={icon} /></span><span className="grow">{label}</span><span className="mono muted">{count(to) || ''}</span>
     </Link>
   )
   return (
@@ -144,7 +144,7 @@ function ListView({ k, q, tasks, lists, areas, desktop, ctx, openId, onBack }: {
       {!desktop && <button className="btn ghost small" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onClick={onBack}><Icon name="back" size={16} />Listas</button>}
       <div className="row between">
         <div className="row">
-          <span style={{ color: `var(--${smart?.color ?? 'neutro'}-fg)` }}><Icon name={search ? 'search' : smart?.icon ?? 'list'} size={28} /></span>
+          <span style={{ color: `var(--${smart?.color ?? 'neutro'}-ink)` }}><Icon name={search ? 'search' : smart?.icon ?? 'list'} size={28} /></span>
           {renaming && list ? (
             <form onSubmit={async (e) => { e.preventDefault(); setRenaming(false) }}>
               <input className="input" autoFocus defaultValue={list.name} maxLength={60} onBlur={(e) => { if (e.target.value.trim()) update<List>('lists', list.id, { name: e.target.value.trim() }); setRenaming(false) }} aria-label="Nome da lista" />

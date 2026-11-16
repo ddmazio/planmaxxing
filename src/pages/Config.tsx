@@ -88,7 +88,7 @@ export function Config() {
       <div className="card caption muted stack" style={{ gap: 6 }}>
         <span className="mono">Instalar o app</span>
         <span><b>iPhone:</b> no Safari, Compartilhar → Adicionar à Tela de Início.</span>
-        <span><b>Android e Chrome no Mac:</b> menu ⋮ → Instalar Dream Board.</span>
+        <span><b>Android e Chrome no Mac:</b> menu ⋮ → Instalar Twelvefold.</span>
         <span>Atualizações chegam sozinhas. Se algo parecer antigo, feche e abra o app de novo.</span>
       </div>
 
@@ -155,7 +155,7 @@ export function ConfigNotificacoes() {
       <div className="card stack" style={{ gap: 10 }}>
         <span className="medium">Neste aparelho</span>
         {DEMO ? <span className="caption muted">Avisos precisam da conta online.</span>
-          : support === 'ios-install' ? <span className="caption muted">No iPhone, os avisos só funcionam com o app instalado: no Safari, Compartilhar → Adicionar à Tela de Início. Depois abra o Dream Board por lá e volte aqui.</span>
+          : support === 'ios-install' ? <span className="caption muted">No iPhone, os avisos só funcionam com o app instalado: no Safari, Compartilhar → Adicionar à Tela de Início. Depois abra o Twelvefold por lá e volte aqui.</span>
           : support === 'no' ? <span className="caption muted">Este navegador não recebe avisos.</span>
           : active ? (
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -216,7 +216,7 @@ export function toIcs(events: CalEvent[]) {
   const dt = (iso: string) => iso.replace(/[-:]/g, '').replace(/\.\d+/, '').replace(/Z?$/, 'Z')
   const d = (iso: string) => { const x = new Date(iso); return `${x.getFullYear()}${String(x.getMonth() + 1).padStart(2, '0')}${String(x.getDate()).padStart(2, '0')}` }
   const now = dt(new Date().toISOString())
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dream Board//PT', 'CALSCALE:GREGORIAN']
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Twelvefold//PT', 'CALSCALE:GREGORIAN']
   for (const e of events) {
     lines.push('BEGIN:VEVENT', `UID:${e.id}@dreamboard`, `DTSTAMP:${now}`,
       e.all_day ? `DTSTART;VALUE=DATE:${d(e.starts_at)}` : `DTSTART:${dt(new Date(e.starts_at).toISOString())}`,
@@ -251,9 +251,9 @@ export function ConfigDados() {
 
       <span className="mono muted">Baixar</span>
       <div className="card flush list">
-        <button className="list-row" onClick={async () => { const data = await exportAll(); save(new Blob([JSON.stringify({ exported_at: new Date().toISOString(), ...data }, null, 2)], { type: 'application/json' }), `dream-board-${day}.json`) }}>
+        <button className="list-row" onClick={async () => { const data = await exportAll(); save(new Blob([JSON.stringify({ exported_at: new Date().toISOString(), ...data }, null, 2)], { type: 'application/json' }), `twelvefold-${day}.json`) }}>
           <Icon name="download" /><div className="grow stack" style={{ gap: 0, textAlign: 'left' }}><span>Exportar tudo (JSON)</span><span className="caption muted">metas, passos, hábitos, agenda, reflexões</span></div><Icon name="chevron" size={16} className="faint" /></button>
-        <button className="list-row" onClick={async () => { const evs = await select<CalEvent>('events', { order: { column: 'starts_at' } }); save(new Blob([toIcs(evs)], { type: 'text/calendar' }), `dream-board-agenda-${day}.ics`) }}>
+        <button className="list-row" onClick={async () => { const evs = await select<CalEvent>('events', { order: { column: 'starts_at' } }); save(new Blob([toIcs(evs)], { type: 'text/calendar' }), `twelvefold-agenda-${day}.ics`) }}>
           <Icon name="calendar" /><div className="grow stack" style={{ gap: 0, textAlign: 'left' }}><span>Exportar agenda (.ics)</span><span className="caption muted">abre no Google, Apple ou Outlook</span></div><Icon name="chevron" size={16} className="faint" /></button>
       </div>
 
@@ -344,7 +344,7 @@ function LookPick({ color, icon, onChange }: { color: AreaColor; icon: string; o
         <span className="card stack look-pop" onMouseLeave={() => setOpen(false)}>
           <span className="mono muted">Cor</span>
           <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            {COLORS.map((c) => <button type="button" key={c} aria-label={c} aria-pressed={c === color} onClick={() => onChange({ color: c })} className="dot" style={{ width: 24, height: 24, background: `var(--${c}-fg)`, boxShadow: c === color ? '0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ink)' : undefined }} />)}
+            {COLORS.map((c) => <button type="button" key={c} aria-label={c} aria-pressed={c === color} onClick={() => onChange({ color: c })} className="dot" style={{ width: 24, height: 24, background: `var(--${c}-ink)`, boxShadow: c === color ? '0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ink)' : undefined }} />)}
           </span>
           <span className="mono muted">Ícone</span>
           <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

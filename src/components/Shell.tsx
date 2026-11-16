@@ -1,3 +1,4 @@
+import { Logo } from './Logo'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
@@ -46,7 +47,7 @@ export function Shell() {
   return (
     <div className="app">
       <aside className="sidebar" aria-label="Navegação">
-        <div className="brand"><span className="brand-mark">db</span>Dream Board</div>
+        <div className="brand"><Logo />Twelvefold</div>
         <div className="side-scroll">
         {SIDE.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => 'nav-item' + (isActive(to) ? ' active' : '')}><Icon name={icon} />{label}</NavLink>

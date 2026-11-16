@@ -1,8 +1,8 @@
-/* Dream Board · avisos (Web Push). Carregado pelo service worker do app (vite.config.ts → workbox.importScripts). */
+/* Twelvefold · avisos (Web Push). Carregado pelo service worker do app (vite.config.ts → workbox.importScripts). */
 self.addEventListener('push', (event) => {
   let m = {}
-  try { m = event.data ? event.data.json() : {} } catch { m = { title: event.data ? event.data.text() : 'Dream Board' } }
-  const title = m.title || 'Dream Board'
+  try { m = event.data ? event.data.json() : {} } catch { m = { title: event.data ? event.data.text() : 'Twelvefold' } }
+  const title = m.title || 'Twelvefold'
   event.waitUntil(self.registration.showNotification(title, {
     body: m.body || '',
     tag: m.tag || undefined,

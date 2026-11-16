@@ -167,7 +167,7 @@ export function Hoje() {
                 <Link key={a.id} to={`/ciclo/area/${a.id}`} className="list-row area-exec">
                   <AreaIcon area={a} size={28} />
                   <span className="grow">{a.name}</span>
-                  <div className="bar" style={{ width: 96 }}><span style={{ width: `${v ?? 0}%`, background: `var(--${a.color}-fg)` }} /></div>
+                  <div className="bar" style={{ width: 96 }}><span style={{ width: `${v ?? 0}%`, background: `var(--${a.color}-ink)` }} /></div>
                   <span className="mono" style={{ width: 36, textAlign: 'right' }}>{v == null ? '–' : `${v}%`}</span>
                 </Link>
               )
