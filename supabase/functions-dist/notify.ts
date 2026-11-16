@@ -312,7 +312,7 @@ Deno.serve(async (req) => {
     const v2 = await vapid();
     if (body.action === "test") {
       const subs2 = await db.get(`push_subscriptions?select=id,owner_id,endpoint,p256dh,auth&owner_id=eq.${user.id}`);
-      const sent2 = await deliver(subs2, { title: "Notifica\xE7\xF5es ligadas \u2713", body: "\xC9 assim que os avisos do Dream Board chegam.", url: "/config/notificacoes", tag: "teste" }, v2);
+      const sent2 = await deliver(subs2, { title: "Notifica\xE7\xF5es ligadas \u2713", body: "\xC9 assim que os avisos do Twelvefold chegam.", url: "/config/notificacoes", tag: "teste" }, v2);
       return json(req, 200, { sent: sent2, devices: subs2.length });
     }
     return json(req, 200, { publicKey: v2.publicKey });

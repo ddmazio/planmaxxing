@@ -27,7 +27,7 @@ a { color: inherit; text-decoration: none; }
 
 /* layout */
 .app { min-height: 100%; display: flex; }
-.main { flex: 1; min-width: 0; padding: max(16px, env(safe-area-inset-top)) 16px 120px; }
+.main { flex: 1; min-width: 0; padding: max(16px, env(safe-area-inset-top)) 16px 136px; }
 .page { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .page.wide { max-width: 1224px; }
 .row { display: flex; align-items: center; gap: 12px; }
@@ -50,17 +50,20 @@ a { color: inherit; text-decoration: none; }
 .brand-mark { width: 30px; height: 30px; border-radius: 9px; flex: none; display: block; }
 .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; color: var(--text-primary); }
 .nav-item:hover { background: var(--bg-muted); }
-.nav-item.active { background: var(--bg-surface); font-weight: 500; box-shadow: 0 1px 0 var(--border); }
+.nav-item.active { background: var(--ink); color: var(--on-ink); font-weight: 500; }
+.nav-item.active:hover { background: var(--ink); }
 .nav-section { padding: 18px 12px 6px; }
 
 /* barra inferior (mobile) */
 .bottom-nav {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom));
-  display: flex; gap: 4px; padding: 6px; border-radius: var(--r-full); background: var(--nav-bg); box-shadow: var(--shadow-float); z-index: 30;
+  display: flex; align-items: center; justify-content: space-between; width: min(380px, calc(100% - 24px));
+  padding: 8px 10px; border-radius: 30px; background: var(--nav-bg); box-shadow: var(--shadow-float), inset 0 0 0 1px var(--border); z-index: 30;
 }
-.bottom-nav a, .bottom-nav button { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: var(--nav-icon); }
-.bottom-nav a.active { background: var(--lime); color: var(--on-lime); }
-.bottom-nav .plus { background: var(--plus-grad); color: #5b2140; }
+.bottom-nav a { width: 62px; height: 54px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--nav-icon); font-size: 12px; line-height: 14px; font-weight: 500; }
+.bottom-nav a span { color: var(--nav-fg); }
+.bottom-nav a.active, .bottom-nav a.active span { background: var(--lime); color: var(--on-lime); }
+.bottom-nav .plus { width: 64px; height: 50px; border-radius: var(--r-full); display: grid; place-items: center; background: var(--plus-grad); color: #5b2140; }
 
 /* superfícies */
 .card { background: var(--bg-surface); border-radius: var(--r-lg); padding: 16px; }
@@ -392,3 +395,20 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .conflict-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .conflict-side { background: var(--bg-canvas); }
 .conflict-diff { background: var(--lime-soft); border-radius: 6px; padding: 0 4px; margin: 0 -4px; }
+
+/* barra do topo: no celular, perfil à esquerda e Início + busca à direita; no computador, o + Novo */
+.topbar { display: flex; align-items: center; gap: 8px; max-width: 1224px; margin: 0 auto 14px; }
+.topbar .icon-btn { box-shadow: inset 0 0 0 1px var(--border); }
+.topbar .icon-btn.ink { box-shadow: none; }
+.topbar-me { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-weight: 500; box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3px var(--border); }
+.new-btn { gap: 6px; }
+@media (min-width: 1024px) { .topbar { margin-bottom: 4px; } }
+
+/* sidebar como cartão (computador) */
+@media (min-width: 1024px) {
+  .sidebar { margin: 12px 0 12px 12px; top: 12px; height: calc(100vh - 24px); padding: 16px 12px 12px; background: var(--bg-surface); border-radius: 24px; box-shadow: inset 0 0 0 1px var(--border); }
+  .side-search { display: flex; align-items: center; gap: 8px; width: 100%; height: 40px; padding: 0 6px 0 12px; border-radius: 12px; background: var(--bg-muted); color: var(--text-secondary); text-align: left; margin-bottom: 4px; }
+  .side-search .kbd { background: var(--bg-surface); }
+  .sidebar .nav-section:first-child { padding-top: 10px; }
+  .side-user { background: var(--bg-muted); border-radius: 14px; box-shadow: none; }
+}

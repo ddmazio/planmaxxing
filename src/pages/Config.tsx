@@ -57,6 +57,7 @@ export function Config() {
   const extra = (profile.currencies_extra ?? []).map((c) => CURRENCY_INFO[c]?.name.split(' ')[0]).filter(Boolean)
   return (
     <div className="page" style={{ maxWidth: 720 }}>
+      <button className="row caption muted" style={{ gap: 4, alignSelf: 'flex-start' }} onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = '/'))}><Icon name="back" size={16} />Voltar</button>
       <PageHeader eyebrow="Perfil" title="Configurações" />
       <span className="caption muted" style={{ marginTop: -12 }}>{city} ({gmt(tz)}){google ? ' · conta Google' : ''}{session?.user.email ? ` · ${session.user.email}` : ''}</span>
 

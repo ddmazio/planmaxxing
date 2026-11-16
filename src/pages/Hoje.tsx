@@ -26,7 +26,7 @@ function quote(lines: string[]) {
 
 export function Hoje() {
   const { profile } = useAuth()
-  const { openQuick, openSearch } = useOutletContext<ShellCtx>()
+  const { openQuick } = useOutletContext<ShellCtx>()
   const today = todayYmd()
   const now = new Date()
   const { cycle, goals, steps, areas, loading } = useCycle()
@@ -63,12 +63,6 @@ export function Hoje() {
         <div className="stack grow" style={{ gap: 2 }}>
           <span className="mono muted" style={{ textTransform: 'uppercase' }}>{eyebrow}</span>
           <h1 className="h1">{greeting(now)}{first ? `, ${first}` : ''}</h1>
-        </div>
-        <button className="search-btn desktop-only" onClick={openSearch}><Icon name="search" size={16} /><span className="grow">Buscar</span><span className="kbd">⌘K</span></button>
-        <div className="row mobile-only" style={{ gap: 8 }}>
-          <button className="icon-btn" aria-label="Buscar" onClick={openSearch}><Icon name="search" size={18} /></button>
-          <Link to="/grupo" className="icon-btn" aria-label="Grupo"><Icon name="users" size={18} /></Link>
-          <Link to="/config" className="icon-btn ink" aria-label="Configurações" style={{ fontWeight: 500 }}>{(profile?.display_name || '?').charAt(0).toUpperCase()}</Link>
         </div>
       </header>
 

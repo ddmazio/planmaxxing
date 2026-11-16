@@ -1,6 +1,6 @@
 import { Logo } from './Logo'
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useRows, useToast } from '../lib/hooks'
 import type { Area, Cycle } from '../lib/types'
@@ -10,9 +10,9 @@ import { QuickAdd } from './QuickAdd'
 import { Search } from './Search'
 import { AreaIcon, Toast } from './ui'
 
-const MAIN: [string, string, string][] = [
-  ['/', 'Hoje', 'home'], ['/agenda', 'Agenda', 'calendar'], ['/tarefas', 'Tarefas', 'check'], ['/financas', 'Finanças', 'wallet'], ['/ciclo', 'Ciclo', 'target'],
-]
+/** menu de baixo no celular: o + fica no meio; Hoje mora no botão Início do topo */
+const MAIN_LEFT: [string, string, string][] = [['/agenda', 'Agenda', 'calendar'], ['/tarefas', 'Tarefas', 'check']]
+const MAIN_RIGHT: [string, string, string][] = [['/financas', 'Finanças', 'wallet'], ['/ciclo', 'Ciclo', 'target']]
 const SIDE: [string, string, string][] = [
   ['/', 'Hoje', 'home'], ['/agenda', 'Agenda', 'calendar'], ['/tarefas', 'Tarefas', 'check'], ['/financas', 'Finanças', 'wallet'],
   ['/ciclo', 'Plano do ciclo', 'target'], ['/reflexoes', 'Reflexões', 'book'], ['/grupo', 'Grupo', 'users'],
@@ -28,6 +28,8 @@ export function Shell() {
   const cycle = currentCycle(cycles)
   const week = cycle ? weekOf(cycle) : 0
   const loc = useLocation()
+  const cicloZone = ['/ciclo', '/reflexoes', '/grupo', '/convite', '/habito', '/semana', '/trimestre'].some((p) => loc.pathname.startsWith(p))
+  const isTab = (to: string) => (to === '/ciclo' ? cicloZone : loc.pathname.startsWith(to))
   const isActive = (to: string) => (to === '/' ? loc.pathname === '/' : to === '/ciclo' ? loc.pathname.startsWith('/ciclo') && !loc.pathname.startsWith('/ciclo/area') : to === '/grupo' ? loc.pathname.startsWith('/grupo') || loc.pathname.startsWith('/convite') : loc.pathname.startsWith(to))
 
   // ⌘K / Ctrl+K abre a busca em qualquer página
@@ -48,11 +50,12 @@ export function Shell() {
     <div className="app">
       <aside className="sidebar" aria-label="Navegação">
         <div className="brand"><Logo />Twelvefold</div>
+        <button className="side-search" onClick={() => setSearch(true)}><Icon name="search" size={16} /><span className="grow">Buscar</span><span className="kbd">⌘K</span></button>
         <div className="side-scroll">
+        <div className="nav-section mono faint">Principal</div>
         {SIDE.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => 'nav-item' + (isActive(to) ? ' active' : '')}><Icon name={icon} />{label}</NavLink>
         ))}
-        <button className="nav-item" onClick={() => setQuick(true)}><Icon name="plus" />Novo</button>
         <div className="nav-section mono faint">Áreas da vida</div>
         {areas.map((a) => (
           <NavLink key={a.id} to={a.is_fixed ? '/financas' : `/ciclo/area/${a.id}`} className={() => 'nav-item' + (loc.pathname === `/ciclo/area/${a.id}` ? ' active' : '')} style={{ paddingTop: 6, paddingBottom: 6 }}>
@@ -72,16 +75,26 @@ export function Shell() {
       </aside>
 
       <main className="main">
+        <div className="topbar">
+          <Link to="/config" className="topbar-me mobile-only" aria-label="Perfil e configurações">{name.charAt(0).toUpperCase()}</Link>
+          <span className="grow" />
+          <NavLink to="/" end className={({ isActive: on }) => 'icon-btn mobile-only' + (on ? ' ink' : '')} aria-label="Início"><Icon name="home" size={19} /></NavLink>
+          <button className="icon-btn mobile-only" aria-label="Buscar" onClick={() => setSearch(true)}><Icon name="search" size={19} /></button>
+          <button className="btn primary new-btn desktop-only" onClick={() => setQuick(true)}><Icon name="plus" size={16} />Novo</button>
+        </div>
         {offline && <div className="offline-bar" role="status"><Icon name="repeat" size={14} />Sem conexão. O que já está na tela continua aqui; mudanças feitas agora podem não ser guardadas até a internet voltar.</div>}
         {demo && <div className="banner" style={{ maxWidth: 1224, margin: '0 auto 12px' }}>Modo demonstração: os dados ficam só neste aparelho. Ligue o Supabase para sincronizar e partilhar.</div>}
         <Outlet context={{ openQuick: () => setQuick(true), openSearch: () => setSearch(true), toast: toast.show }} />
       </main>
 
       <nav className="bottom-nav" aria-label="Navegação principal">
-        {MAIN.map(([to, label, icon]) => (
-          <NavLink key={to} to={to} aria-label={label} className={() => (isActive(to) ? 'active' : '')}><Icon name={icon} size={22} /></NavLink>
+        {MAIN_LEFT.map(([to, label, icon]) => (
+          <NavLink key={to} to={to} className={() => (isTab(to) ? 'active' : '')}><Icon name={icon} size={22} /><span>{label}</span></NavLink>
         ))}
-        <button className="plus" aria-label="Novo" onClick={() => setQuick(true)}><Icon name="plus" size={22} /></button>
+        <button className="plus" aria-label="Novo" onClick={() => setQuick(true)}><Icon name="plus" size={24} /></button>
+        {MAIN_RIGHT.map(([to, label, icon]) => (
+          <NavLink key={to} to={to} className={() => (isTab(to) ? 'active' : '')}><Icon name={icon} size={22} /><span>{label}</span></NavLink>
+        ))}
       </nav>
 
       <Search open={search} onClose={() => setSearch(false)} />
