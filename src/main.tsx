@@ -15,6 +15,7 @@ import { Hoje } from './pages/Hoje'
 import { Tarefas, TarefaRoute } from './pages/Tarefas'
 import { Agenda } from './pages/Agenda'
 import { Config, applyTheme, savedTheme, ConfigAreas, ConfigConexoes, ConfigDados, ConfigNotificacoes } from './pages/Config'
+import { ConfigAdmin } from './pages/Admin'
 import { Financas } from './pages/Financas'
 import { AceitarConvite, Grupo } from './pages/Grupo'
 import { Reflexoes } from './pages/Reflexoes'
@@ -77,6 +78,7 @@ function Gate() {
         <Route path="config/conexoes" element={<ConfigConexoes />} />
         <Route path="config/notificacoes" element={<ConfigNotificacoes />} />
         <Route path="config/dados" element={<ConfigDados />} />
+        <Route path="config/admin" element={<ConfigAdmin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

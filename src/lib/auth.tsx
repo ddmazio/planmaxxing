@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }
   const signInEmail = async (email: string) => {
-    const { error } = await supabase!.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin, shouldCreateUser: true } })
+    const { error } = await supabase!.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin, shouldCreateUser: false } })
     if (error) throw error
   }
   const signOut = async () => {

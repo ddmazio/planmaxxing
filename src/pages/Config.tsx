@@ -15,6 +15,7 @@ import { ptBR } from 'date-fns/locale'
 import { AreaIcon, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader } from '../components/Shell'
+import { useIsAdmin } from './Admin'
 
 type Theme = 'system' | 'light' | 'dark'
 export function applyTheme(t: Theme) {
@@ -41,6 +42,7 @@ export function Config() {
   const { rows: areas } = useRows<Area>('areas', { eq: { archived: false } })
   const { rows: integ } = useRows<Integration>('integrations', { columns: COLS }, !DEMO)
   const [pushOn, setPushOn] = useState<boolean | null>(null)
+  const isAdmin = useIsAdmin()
   const [sp] = useSearchParams()
   const nav = useNavigate()
   // a volta do Google (…/config?conectado=google) abre a página de conexões
@@ -94,6 +96,7 @@ export function Config() {
       <div className="card flush list">
         <Row icon="users" label="Grupo e convites" to="/grupo" />
         <Row icon="shield" label="Dados e privacidade" to="/config/dados" />
+        {isAdmin && <Row icon="star" label="Administração" value="convites e contas" to="/config/admin" />}
         <button className="list-row" onClick={signOut}><Icon name="logout" /><span className="grow" style={{ textAlign: 'left' }}>Sair</span></button>
       </div>
       <p className="caption faint row" style={{ margin: 0 }}><Icon name="shield" size={16} />Ninguém além de você lê seus dados. Finanças nunca aparecem para o grupo.</p>

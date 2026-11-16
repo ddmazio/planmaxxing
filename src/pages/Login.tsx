@@ -2,16 +2,27 @@ import { useState } from 'react'
 import { DEMO } from '../lib/db'
 import { useAuth } from '../lib/auth'
 
+const INVITE_ONLY = 'Este app é só para convidados. Peça um convite a quem te chamou e use o mesmo e-mail do convite.'
+function reason(msg: string) {
+  if (/signups? not allowed|not allowed for otp|user not found/i.test(msg)) return INVITE_ONLY
+  if (/banned/i.test(msg)) return 'Esta conta está bloqueada. Fale com quem administra o app.'
+  return 'Não deu certo. Confira e tente de novo.'
+}
+
 export function Login() {
   const { signInGoogle, signInEmail, startDemo } = useAuth()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // a volta do Google com erro (ex.: conta não convidada ou bloqueada) chega no endereço
+  const [err, setErr] = useState<string | null>(() => {
+    const q = new URLSearchParams(window.location.search + '&' + window.location.hash.slice(1))
+    return q.get('error') ? reason(q.get('error_description') ?? q.get('error') ?? '') : null
+  })
   const run = async (fn: () => Promise<void>) => {
     setErr(null); setBusy(true)
-    try { await fn() } catch { setErr('Não deu certo. Confira e tente de novo.') } finally { setBusy(false) }
+    try { await fn() } catch (e) { setErr(reason(e instanceof Error ? e.message : '')) } finally { setBusy(false) }
   }
 
   return (
