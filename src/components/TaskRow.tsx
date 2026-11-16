@@ -7,13 +7,15 @@ import { Icon } from './Icon'
 import { AreaTag, Check } from './ui'
 
 /** compact: no Hoje, a data de hoje não se repete (fica só a hora, como no Figma: “Casa · 18:00”). */
-export function TaskRow({ task, lists, areas, compact, items, goalOfStep, href, selected }: {
+export function TaskRow({ task, lists, areas, compact, items, goalOfStep, href, selected, typed }: {
   task: Task; lists: List[]; areas: Area[]; compact?: boolean
   /** etapas da tarefa (para “2 de 4 etapas” e, no Hoje, a próxima etapa) */
   items?: TaskItem[]
   /** nome da meta de um passo (para “Passo da meta “…””) */
   goalOfStep?: (stepId: string) => string | undefined
   href?: string; selected?: boolean
+  /** mostra a etiqueta “Tarefa” (na lista Para hoje, que mistura passos, tarefas e hábitos) */
+  typed?: boolean
 }) {
   const nav = useNavigate()
   const to = href ?? `/tarefa/${task.id}`
@@ -36,8 +38,9 @@ export function TaskRow({ task, lists, areas, compact, items, goalOfStep, href, 
       <Check done={!!task.completed_at} onToggle={() => toggleTask(task)} label={task.completed_at ? 'Reabrir tarefa' : 'Concluir tarefa'} />
       <div className="grow">
         <div className={task.completed_at ? 'done-text' : ''}>{task.title}</div>
-        {(meta.length > 0 || area) && !task.completed_at && (
+        {(meta.length > 0 || area || typed) && !task.completed_at && (
           <div className="row caption muted" style={{ gap: 6, flexWrap: 'wrap' }}>
+            {typed && <span className="type-pill">Tarefa</span>}
             {meta.map((m, i) => <span key={i} style={late && i === meta.length - 1 ? { color: 'var(--danger)' } : undefined}>{i ? '· ' : ''}{m}</span>)}
             {task.repeat_rule && <Icon name="repeat" size={12} />}
             <AreaTag area={area} />

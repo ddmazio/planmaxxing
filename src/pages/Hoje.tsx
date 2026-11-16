@@ -221,7 +221,7 @@ export function Hoje() {
                 })}
                 {(kind === 'tudo' || kind === 'tarefa') && todays.map((t) => (
                   <SwipeRow key={t.id} actions={[{ label: 'Amanhã', icon: 'clock', tone: 'mustard', run: () => postponeTask(t) }, { label: 'Feito', icon: 'check', tone: 'lime', run: () => toggleTask(t) }]}>
-                    <TaskRow task={t} lists={lists} areas={areas} compact items={items.filter((i) => i.task_id === t.id)} />
+                    <TaskRow task={t} lists={lists} areas={areas} compact typed items={items.filter((i) => i.task_id === t.id)} />
                   </SwipeRow>
                 ))}
                 {(kind === 'tudo' || kind === 'habito') && habitsToday.map((h) => {
