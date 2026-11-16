@@ -55,7 +55,7 @@
   ],
   "redirects": [
     {
-      "source": "/((?!assets/|icons/|sw.js|workbox-|manifest.webmanifest|push-sw.js|favicon.ico).*)",
+      "source": "/((?!assets/|icons/|sw.js|workbox-|manifest.webmanifest|push-sw.js|favicon.ico|registerSW.js|index.html).*)",
       "has": [
         {
           "type": "host",
