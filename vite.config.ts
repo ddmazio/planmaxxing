@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'script-defer',
-      includeAssets: ['icons/*.png', 'icons/icon.svg'],
+      includeAssets: ['icons/*.png', 'icons/tf-icon.svg', 'favicon.ico'],
       manifest: {
         name: 'Twelvefold',
         short_name: 'Twelvefold',
@@ -20,9 +20,9 @@ export default defineConfig({
         background_color: '#fbf1ee',
         theme_color: '#5b2140',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/tf-icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icons/tf-icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/icons/tf-icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {

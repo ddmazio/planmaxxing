@@ -6,7 +6,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, {
     body: m.body || '',
     tag: m.tag || undefined,
-    icon: '/icons/icon-192.png',
+    icon: '/icons/tf-icon-192.png',
     data: { url: typeof m.url === 'string' && m.url.startsWith('/') ? m.url : '/' },
   }))
 })
