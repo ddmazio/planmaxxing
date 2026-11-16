@@ -29,9 +29,6 @@ import { Ritual } from './pages/Semana'
 import { Trimestre } from './pages/Trimestre'
 import { DEMO } from './lib/db'
 
-// endereço antigo: o app aberto pelo cache (ou instalado) leva para o endereço novo
-if (location.hostname === 'planmaxxing.vercel.app') location.replace('https://twelvefold-app.vercel.app' + location.pathname + location.search + location.hash)
-
 applyTheme(savedTheme())
 
 // quando uma versão nova do app assume, recarrega uma vez para usar os arquivos novos

@@ -52,18 +52,5 @@
         }
       ]
     }
-  ],
-  "redirects": [
-    {
-      "source": "/((?!assets/|icons/|sw.js|workbox-|manifest.webmanifest|push-sw.js|favicon.ico|registerSW.js|index.html).*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "planmaxxing.vercel.app"
-        }
-      ],
-      "destination": "https://twelvefold-app.vercel.app/$1",
-      "permanent": true
-    }
   ]
 }
