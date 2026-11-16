@@ -1,13 +1,15 @@
 import { Logo } from './Logo'
-import { useEffect, useState, type ReactNode } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import type { QuickKind } from '../lib/parse'
+import type { UndoMsg } from '../lib/undo'
 import { useAuth } from '../lib/auth'
 import { useRows, useToast } from '../lib/hooks'
 import type { Area, Cycle } from '../lib/types'
 import { currentCycle, weekOf, TOTAL_WEEKS } from '../lib/cycle'
 import { Icon } from './Icon'
 import { QuickAdd } from './QuickAdd'
-import { Search } from './Search'
+import { GOTO, Search } from './Search'
 import { AreaIcon, Toast } from './ui'
 
 /** menu de baixo no celular: o + fica no meio; Hoje mora no botão Início do topo */
@@ -32,12 +34,28 @@ export function Shell() {
   const isTab = (to: string) => (to === '/ciclo' ? cicloZone : loc.pathname.startsWith(to))
   const isActive = (to: string) => (to === '/' ? loc.pathname === '/' : to === '/ciclo' ? loc.pathname.startsWith('/ciclo') && !loc.pathname.startsWith('/ciclo/area') : to === '/grupo' ? loc.pathname.startsWith('/grupo') || loc.pathname.startsWith('/convite') : loc.pathname.startsWith(to))
 
-  // ⌘K / Ctrl+K abre a busca em qualquer página
+  const nav = useNavigate()
+  const [quickKind, setQuickKind] = useState<QuickKind | null>(null)
+  const openNew = (k: QuickKind | null = null) => { setQuickKind(k); setQuick(true) }
+  // ⌘K abre a paleta; N cria; G e depois uma letra vai para a página (fora de campos de texto)
+  const gAt = useRef(0)
   useEffect(() => {
-    const on = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearch((v) => !v) } }
+    const on = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearch((v) => !v); return }
+      const el = e.target as HTMLElement | null
+      if (e.metaKey || e.ctrlKey || e.altKey || (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) || document.querySelector('[aria-modal="true"]')) return
+      const k = e.key.toLowerCase()
+      if (Date.now() - gAt.current < 1200) { gAt.current = 0; const hit = GOTO.find(([key]) => key === k); if (hit) { e.preventDefault(); nav(hit[2]) } return }
+      if (k === 'g') { gAt.current = Date.now(); return }
+      if (k === 'n') { e.preventDefault(); openNew('task') }
+    }
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
-  }, [])
+  }, [nav])
+  // aviso com Desfazer
+  const [undo, setUndo] = useState<UndoMsg | null>(null)
+  useEffect(() => { const on = (e: Event) => setUndo((e as CustomEvent<UndoMsg>).detail); window.addEventListener('tf-undo', on); return () => window.removeEventListener('tf-undo', on) }, [])
+  useEffect(() => { if (!undo) return; const t = setTimeout(() => setUndo((u) => (u?.id === undo.id ? null : u)), 4000); return () => clearTimeout(t) }, [undo])
   const name = profile?.display_name || 'Você'
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine)
   useEffect(() => {
@@ -80,26 +98,31 @@ export function Shell() {
           <span className="grow" />
           <NavLink to="/" end className={({ isActive: on }) => 'icon-btn mobile-only' + (on ? ' ink' : '')} aria-label="Início"><Icon name="home" size={19} /></NavLink>
           <button className="icon-btn mobile-only" aria-label="Buscar" onClick={() => setSearch(true)}><Icon name="search" size={19} /></button>
-          <button className="btn primary new-btn desktop-only" onClick={() => setQuick(true)}><Icon name="plus" size={16} />Novo</button>
+          <button className="btn primary new-btn desktop-only" onClick={() => openNew()}><Icon name="plus" size={16} />Novo</button>
         </div>
         {offline && <div className="offline-bar" role="status"><Icon name="repeat" size={14} />Sem conexão. O que já está na tela continua aqui; mudanças feitas agora podem não ser guardadas até a internet voltar.</div>}
         {demo && <div className="banner" style={{ maxWidth: 1224, margin: '0 auto 12px' }}>Modo demonstração: os dados ficam só neste aparelho. Ligue o Supabase para sincronizar e partilhar.</div>}
-        <Outlet context={{ openQuick: () => setQuick(true), openSearch: () => setSearch(true), toast: toast.show }} />
+        <Outlet context={{ openQuick: () => openNew(), openSearch: () => setSearch(true), toast: toast.show }} />
       </main>
 
       <nav className="bottom-nav" aria-label="Navegação principal">
         {MAIN_LEFT.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => (isTab(to) ? 'active' : '')}><Icon name={icon} size={22} /><span>{label}</span></NavLink>
         ))}
-        <button className="plus" aria-label="Novo" onClick={() => setQuick(true)}><Icon name="plus" size={24} /></button>
+        <button className="plus" aria-label="Novo" onClick={() => openNew()}><Icon name="plus" size={24} /></button>
         {MAIN_RIGHT.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => (isTab(to) ? 'active' : '')}><Icon name={icon} size={22} /><span>{label}</span></NavLink>
         ))}
       </nav>
 
-      <Search open={search} onClose={() => setSearch(false)} />
-      <QuickAdd open={quick} onClose={() => setQuick(false)} onDone={toast.show} />
-      <Toast msg={toast.msg} />
+      <Search open={search} onClose={() => setSearch(false)} onNew={(k) => openNew(k)} />
+      <QuickAdd open={quick} onClose={() => setQuick(false)} onDone={toast.show} initialKind={quickKind} />
+      {undo ? (
+        <div className="toast undo-toast" role="status">
+          <span className="grow">{undo.msg}</span>
+          <button className="undo-btn" onClick={() => { const u = undo; setUndo(null); u.undo() }}>Desfazer</button>
+        </div>
+      ) : <Toast msg={toast.msg} />}
     </div>
   )
 }

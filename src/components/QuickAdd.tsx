@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { insert } from '../lib/db'
 import { parseQuick, type QuickKind } from '../lib/parse'
@@ -13,9 +13,10 @@ const KINDS: [QuickKind, string][] = [['task', 'Tarefa'], ['event', 'Compromisso
 const CAT = { needs: 'Necessidades', wants: 'Desejos', savings: 'Economias' }
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 
-export function QuickAdd({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (msg: string) => void }) {
+export function QuickAdd({ open, onClose, onDone, initialKind }: { open: boolean; onClose: () => void; onDone: (msg: string) => void; initialKind?: QuickKind | null }) {
   const [text, setText] = useState('')
   const [forced, setForced] = useState<QuickKind | null>(null)
+  useEffect(() => { if (open) setForced(initialKind ?? null) }, [open, initialKind])
   const [busy, setBusy] = useState(false)
   const nav = useNavigate()
   const { profile } = useAuth()

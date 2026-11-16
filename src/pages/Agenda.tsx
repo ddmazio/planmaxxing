@@ -9,6 +9,7 @@ import { addDays, fmt, fromYmd, hhmm, isSameDay, toIso, todayYmd, weekDays, week
 import { layoutDay, useCalendars, useGoogleLink } from '../lib/calendars'
 import type { Area, CalEvent, ConflictSide, EventConflict } from '../lib/types'
 import { Sheet, Toggle } from '../components/ui'
+import { undoable } from '../lib/undo'
 import { Icon } from '../components/Icon'
 
 type View = 'dia' | 'semana' | 'mes'
@@ -121,6 +122,19 @@ function CalendarList({ cals }: { cals: ReturnType<typeof useCalendars> }) {
 }
 
 const dayStart = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+/** 5.4 · intervalos livres do dia (em horas), entre 8h e 21h, a partir de agora se for hoje; só os de 1h ou mais */
+function freeGaps(timed: CalEvent[], d: Date, now: Date): [number, number][] {
+  const h = (iso: string) => { const x = new Date(iso); return isSameDay(x, d) ? x.getHours() + x.getMinutes() / 60 : x < d ? 0 : 24 }
+  let from = 8
+  if (isSameDay(d, now)) from = Math.max(from, Math.ceil((now.getHours() + now.getMinutes() / 60) * 4) / 4)
+  const busy = timed.map((e) => [h(e.starts_at), h(e.ends_at)] as [number, number]).sort((a, b) => a[0] - b[0])
+  const out: [number, number][] = []
+  let cur = from
+  for (const [a, b] of busy) { if (a - cur >= 1 && a <= 21) out.push([cur, Math.min(a, 21)]); cur = Math.max(cur, b) }
+  if (21 - cur >= 1) out.push([cur, 21])
+  return out
+}
+const fmtGap = (hrs: number) => { const m = Math.round(hrs * 60); return `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, '0') : ''}` }
 /** Evento que cobre o dia (para os de vários dias). */
 const covers = (e: CalEvent, d: Date) => new Date(e.starts_at) < addDays(dayStart(d), 1) && new Date(e.ends_at) > dayStart(d)
 /** Vai para a faixa de cima: dia inteiro, ou com hora mas atravessando mais de 24h. */
@@ -180,6 +194,30 @@ function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events
     return () => { window.removeEventListener('resize', fit); ro.disconnect() }
   }, [])
   const cols = `36px repeat(${days.length}, minmax(0, 1fr))`
+  // 5.3 · arrastar um bloco para outro horário (passo de 15 min). No celular: segure um instante e arraste.
+  const [drag, setDrag] = useState<{ id: string; y0: number; dy: number; on: boolean; timer?: number } | null>(null)
+  const dragRef = useRef(drag); dragRef.current = drag
+  const moved = useRef(false)
+  useEffect(() => {
+    const el = scroller.current; if (!el) return
+    const block = (e: TouchEvent) => { if (dragRef.current?.on) e.preventDefault() }
+    el.addEventListener('touchmove', block, { passive: false })
+    return () => el.removeEventListener('touchmove', block)
+  }, [])
+  const movable = (e: CalEvent) => !(e.external_id?.startsWith('gcal:') && !e.sync_google)
+  const snap = (dy: number) => Math.round(((dy / HOUR_PX) * 60) / 15) * 15
+  const finish = async (e: CalEvent) => {
+    const d = dragRef.current; setDrag(null)
+    if (!d?.on) return
+    const m = snap(d.dy)
+    if (!m) return
+    moved.current = true; setTimeout(() => { moved.current = false }, 50)
+    const before = { starts_at: e.starts_at, ends_at: e.ends_at }
+    const shift = (iso: string) => new Date(new Date(iso).getTime() + m * 60000).toISOString()
+    const next = { starts_at: shift(e.starts_at), ends_at: shift(e.ends_at) }
+    await update<CalEvent>('events', e.id, next)
+    undoable(`${e.title} foi para ${hhmm(next.starts_at)}`, () => update<CalEvent>('events', e.id, before))
+  }
   return (
     <div className="card" style={{ padding: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: cols }}>
@@ -201,6 +239,11 @@ function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events
             <div key={'c' + d.toISOString()} style={{ position: 'relative', borderLeft: '1px solid var(--border)' }}>
               {HOURS.map((h) => <div key={h} className="cal-hour" />)}
               {isSameDay(d, now) && <div style={{ position: 'absolute', left: 0, right: 0, top: (now.getHours() + now.getMinutes() / 60) * HOUR_PX, height: 2, background: 'var(--danger)', zIndex: 2 }} />}
+              {days.length === 1 && freeGaps(timed, d, now).map(([a, b]) => (
+                <button key={a} className="cal-free" onClick={() => onNew(d)} style={{ top: a * HOUR_PX + 2, height: (b - a) * HOUR_PX - 4 }} aria-label={`Tempo livre, ${fmtGap(b - a)}`}>
+                  <span className="mono">livre {fmtGap(b - a)}</span>
+                </button>
+              ))}
               {timed.map((e) => {
                 const s = new Date(e.starts_at), en = new Date(e.ends_at)
                 const top = (s.getHours() + s.getMinutes() / 60) * HOUR_PX
@@ -209,10 +252,26 @@ function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events
                 const { col, cols: n } = lay.get(e.id) ?? { col: 0, cols: 1 }
                 const p = paint(e)
                 return (
-                  <button key={e.id} onClick={() => onOpen(e.id)} className={'cal-event ' + e.kind} title={`${hhmm(e.starts_at)} ${e.title}`}
-                    style={{ top, height: h, left: `calc(${(col * 100) / n}% + 2px)`, width: `calc(${100 / n}% - 4px)`, ...(e.kind === 'plan' ? { background: p.bg, color: p.on } : { ['--ev-fg' as string]: p.fg, background: `color-mix(in srgb, ${p.fg} 10%, var(--bg-surface))` }) }}>
+                  <button key={e.id} onClick={() => { if (!moved.current) onOpen(e.id) }} className={'cal-event ' + e.kind + (drag?.id === e.id && drag.on ? ' dragging' : '')} title={`${hhmm(e.starts_at)} ${e.title}`}
+                    onPointerDown={(ev) => {
+                      if (!movable(e) || ev.button !== 0) return
+                      const touch = ev.pointerType === 'touch'
+                      const st = { id: e.id, y0: ev.clientY, dy: 0, on: !touch, timer: undefined as number | undefined }
+                      if (touch) st.timer = window.setTimeout(() => setDrag((d) => (d && d.id === e.id ? { ...d, on: true } : d)), 350)
+                      if (!touch) (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId)
+                      setDrag(st)
+                    }}
+                    onPointerMove={(ev) => {
+                      const d = dragRef.current; if (!d || d.id !== e.id) return
+                      const dy = ev.clientY - d.y0
+                      if (!d.on) { if (Math.abs(dy) > 8) { clearTimeout(d.timer); setDrag(null) } return }
+                      setDrag({ ...d, dy })
+                    }}
+                    onPointerUp={() => { clearTimeout(dragRef.current?.timer); finish(e) }}
+                    onPointerCancel={() => { clearTimeout(dragRef.current?.timer); setDrag(null) }}
+                    style={{ top: top + (drag?.id === e.id && drag.on ? (snap(drag.dy) / 60) * HOUR_PX : 0), height: h, left: `calc(${(col * 100) / n}% + 2px)`, width: `calc(${100 / n}% - 4px)`, ...(e.kind === 'plan' ? { background: p.bg, color: p.on } : { ['--ev-fg' as string]: p.fg, background: `color-mix(in srgb, ${p.fg} 10%, var(--bg-surface))` }) }}>
                     <div className="medium" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</div>
-                    {h > 34 && <div style={{ opacity: 0.75 }}>{hhmm(e.starts_at)}</div>}
+                    {h > 34 && <div style={{ opacity: 0.75 }}>{drag?.id === e.id && drag.on ? hhmm(new Date(new Date(e.starts_at).getTime() + snap(drag.dy) * 60000).toISOString()) : hhmm(e.starts_at)}</div>}
                   </button>
                 )
               })}

@@ -4,6 +4,7 @@ import { useRows } from '../lib/hooks'
 import { addDays, fmt, toIso, todayYmd, ymd } from '../lib/dates'
 import type { Area, CalEvent, Goal, List, Step, Task } from '../lib/types'
 import { Icon } from './Icon'
+import type { QuickKind } from '../lib/parse'
 
 const PAGES: [string, string][] = [
   ['Hoje', '/'], ['Agenda', '/agenda'], ['Tarefas', '/tarefas'], ['Finanças', '/financas'], ['Plano do ciclo', '/ciclo'],
@@ -12,14 +13,17 @@ const PAGES: [string, string][] = [
 
 const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
-interface Hit { kind: string; title: string; sub?: string; to: string }
+interface Hit { kind: string; title: string; sub?: string; to?: string; run?: () => void; keys?: string[] }
+
+/** atalhos de teclado: G e depois a letra leva à página */
+export const GOTO: [string, string, string][] = [['h', 'Hoje', '/'], ['a', 'Agenda', '/agenda'], ['t', 'Tarefas', '/tarefas'], ['f', 'Finanças', '/financas'], ['p', 'Plano do ciclo', '/ciclo'], ['r', 'Reflexões', '/reflexoes'], ['g', 'Grupo', '/grupo'], ['c', 'Configurações', '/config']]
 
 /** Busca geral (⌘K): tarefas, metas, passos, agenda, listas, áreas e páginas. */
-export function Search({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return open ? <Palette onClose={onClose} /> : null
+export function Search({ open, onClose, onNew }: { open: boolean; onClose: () => void; onNew: (k: QuickKind) => void }) {
+  return open ? <Palette onClose={onClose} onNew={onNew} /> : null
 }
 
-function Palette({ onClose }: { onClose: () => void }) {
+function Palette({ onClose, onNew }: { onClose: () => void; onNew: (k: QuickKind) => void }) {
   const nav = useNavigate()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
@@ -36,10 +40,18 @@ function Palette({ onClose }: { onClose: () => void }) {
 
   const hits = useMemo<Hit[]>(() => {
     const t = norm(q.trim())
-    if (!t) return PAGES.map(([title, to]) => ({ kind: 'Página', title, to }))
+    const ACTIONS: Hit[] = [
+      { kind: 'Ação', title: 'Nova tarefa', run: () => onNew('task'), keys: ['N'] },
+      { kind: 'Ação', title: 'Novo compromisso', run: () => onNew('event') },
+      { kind: 'Ação', title: 'Lançar gasto', run: () => onNew('expense') },
+      { kind: 'Ação', title: 'Novo hábito', run: () => onNew('habit') },
+    ]
+    const GO: Hit[] = GOTO.map(([k, title, to]) => ({ kind: 'Ir para', title, to, keys: ['G', k.toUpperCase()] }))
+    if (!t) return [...ACTIONS, ...GO, { kind: 'Ir para', title: 'Ritual da semana', to: '/ciclo/ritual' }]
     const m = (s: string | null | undefined) => !!s && norm(s).includes(t)
     const today = todayYmd()
     const out: Hit[] = [
+      ...ACTIONS.filter((x) => m(x.title)),
       ...PAGES.filter(([title]) => m(title)).map(([title, to]) => ({ kind: 'Página', title, to })),
       ...tasks.filter((x) => m(x.title) || m(x.notes)).sort((a, b) => Number(!!a.completed_at) - Number(!!b.completed_at))
         .map((x) => ({ kind: x.completed_at ? 'Tarefa feita' : 'Tarefa', title: x.title, sub: lists.find((l) => l.id === x.list_id)?.name, to: `/tarefa/${x.id}` })),
@@ -51,9 +63,9 @@ function Palette({ onClose }: { onClose: () => void }) {
       ...areas.filter((x) => m(x.name)).map((x) => ({ kind: 'Área', title: x.name, to: x.is_fixed ? '/financas' : `/ciclo/area/${x.id}` })),
     ]
     return out.slice(0, 40)
-  }, [q, tasks, goals, steps, lists, areas, events])
+  }, [q, tasks, goals, steps, lists, areas, events, onNew])
 
-  const go = (h?: Hit) => { if (!h) return; onClose(); nav(h.to) }
+  const go = (h?: Hit) => { if (!h) return; onClose(); if (h.run) h.run(); else if (h.to) nav(h.to) }
 
   return (
     <div className="overlay search-overlay" onClick={onClose}>
@@ -72,13 +84,14 @@ function Palette({ onClose }: { onClose: () => void }) {
         </div>
         <div id="search-results" role="listbox" className="search-results">
           {hits.length ? hits.map((h, i) => (
-            <button key={h.kind + h.to + h.title + i} role="option" aria-selected={i === sel} className={'search-hit' + (i === sel ? ' on' : '')}
+            <button key={h.kind + (h.to ?? '') + h.title + i} role="option" aria-selected={i === sel} className={'search-hit' + (i === sel ? ' on' : '')}
               onMouseEnter={() => setSel(i)} onClick={() => go(h)}>
               <span className="mono faint" style={{ width: 84, flex: 'none' }}>{h.kind}</span>
               <span className="grow stack" style={{ gap: 0 }}>
                 <span>{h.title}</span>
                 {h.sub && <span className="caption muted">{h.sub}</span>}
               </span>
+              {h.keys && <span className="row" style={{ gap: 4 }}>{h.keys.map((k) => <span key={k} className="kbd">{k}</span>)}</span>}
             </button>
           )) : <p className="caption muted" style={{ padding: 16, margin: 0 }}>Nada encontrado para “{q}”.</p>}
         </div>

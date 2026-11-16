@@ -4,7 +4,9 @@ import { insert, remove, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, greeting, hhmm, toIso, todayYmd, weekDays, ymd } from '../lib/dates'
-import { isToday } from '../lib/tasks'
+import { isToday, postponeTask, toggleTask } from '../lib/tasks'
+import { undoable } from '../lib/undo'
+import { SwipeRow } from '../components/SwipeRow'
 import { EXEC_WEEKS, TOTAL_WEEKS, weekOf } from '../lib/cycle'
 import { areaExecution, cycleWeekDays, execEnd } from '../lib/execution'
 import type { CalEvent, Habit, HabitLog, List, Step, Task, TaskItem } from '../lib/types'
@@ -15,7 +17,14 @@ import type { ShellCtx } from '../components/Shell'
 import { useCycle } from './Ciclo'
 import { useCalendars } from '../lib/calendars'
 
-const toggleStep = (s: Step) => update<Step>('steps', s.id, { done_at: s.done_at ? null : new Date().toISOString() })
+const toggleStep = async (s: Step) => {
+  await update<Step>('steps', s.id, { done_at: s.done_at ? null : new Date().toISOString() })
+  if (!s.done_at) undoable('Passo concluído', () => update<Step>('steps', s.id, { done_at: null }))
+}
+const markHabit = async (habitId: string, day: string) => {
+  const log = await insert<HabitLog>('habit_logs', { habit_id: habitId, day })
+  undoable('Hábito marcado', () => remove('habit_logs', log.id))
+}
 
 type Kind = 'tudo' | 'passo' | 'tarefa' | 'habito'
 const OPEN_KEY = 'hoje-abertos'
@@ -197,27 +206,37 @@ export function Hoje() {
                 {(kind === 'tudo' || kind === 'passo') && weekSteps.map((s) => {
                   const g = goalOf(s.goal_id)
                   return (
-                    <div key={s.id} className="list-row">
+                    <SwipeRow key={s.id} actions={s.done_at ? [] : [
+                      ...(week < EXEC_WEEKS ? [{ label: 'Adiar', icon: 'clock', tone: 'mustard' as const, run: async () => { await update<Step>('steps', s.id, { week: s.week + 1 }); undoable('Passo foi para a próxima semana', () => update<Step>('steps', s.id, { week: s.week })) } }] : []),
+                      { label: 'Feito', icon: 'check', tone: 'lime' as const, run: () => toggleStep(s) }]}>
+                    <div className="list-row">
                       <Check done={!!s.done_at} onToggle={() => toggleStep(s)} label={s.done_at ? `Desmarcar ${s.title}` : `Concluir ${s.title}`} />
                       <div className="grow stack" style={{ gap: 4, minWidth: 0 }}>
                         <span className={s.done_at ? 'done-text' : ''}>{s.title}</span>
                         <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}><TypePill>Passo</TypePill><AreaTag area={areas.find((a) => a.id === g?.area_id)} />{g && <span className="caption muted ellipsis">{g.title}</span>}</span>
                       </div>
                     </div>
+                    </SwipeRow>
                   )
                 })}
-                {(kind === 'tudo' || kind === 'tarefa') && todays.map((t) => <TaskRow key={t.id} task={t} lists={lists} areas={areas} compact items={items.filter((i) => i.task_id === t.id)} />)}
+                {(kind === 'tudo' || kind === 'tarefa') && todays.map((t) => (
+                  <SwipeRow key={t.id} actions={[{ label: 'Amanhã', icon: 'clock', tone: 'mustard', run: () => postponeTask(t) }, { label: 'Feito', icon: 'check', tone: 'lime', run: () => toggleTask(t) }]}>
+                    <TaskRow task={t} lists={lists} areas={areas} compact items={items.filter((i) => i.task_id === t.id)} />
+                  </SwipeRow>
+                ))}
                 {(kind === 'tudo' || kind === 'habito') && habitsToday.map((h) => {
                   const log = logsToday.find((l) => l.habit_id === h.id)
                   return (
-                    <div key={h.id} className="list-row">
+                    <SwipeRow key={h.id} actions={log ? [] : [{ label: 'Feito', icon: 'check', tone: 'lime', run: () => markHabit(h.id, today) }]}>
+                    <div className="list-row">
                       <Check done={!!log} label={log ? `Desmarcar ${h.title}` : `Marcar ${h.title}`}
-                        onToggle={() => (log ? remove('habit_logs', log.id) : insert<HabitLog>('habit_logs', { habit_id: h.id, day: today }))} />
+                        onToggle={() => (log ? remove('habit_logs', log.id) : markHabit(h.id, today))} />
                       <Link to={`/habito/${h.id}`} className="grow stack" style={{ gap: 4, minWidth: 0 }}>
                         <span className={log ? 'done-text' : ''}>{h.title}</span>
                         <span className="row" style={{ gap: 6 }}><TypePill>Hábito</TypePill><AreaTag area={areas.find((a) => a.id === h.area_id)} /></span>
                       </Link>
                     </div>
+                    </SwipeRow>
                   )
                 })}
                 {listTotal === 0 && <div className="list-row caption muted">Nada para hoje ainda.</div>}
