@@ -91,9 +91,9 @@ var SUPABASE_URL = env("SUPABASE_URL");
 var KEYS = projectKeys(env);
 var KEY = KEYS.service;
 var db = makeDb(SUPABASE_URL, KEY);
-var APP = env("APP_URL") || "https://planmaxxing.vercel.app";
+var APP = env("APP_URL") || "https://twelvefold-app.vercel.app";
 var REDIRECT = `${SUPABASE_URL}/functions/v1/connect`;
-var ORIGINS = ["https://planmaxxing.vercel.app", "http://localhost:5173"];
+var ORIGINS = ["https://twelvefold-app.vercel.app", "https://planmaxxing.vercel.app", "http://localhost:5173"];
 var cors = (req) => ({
   "Access-Control-Allow-Origin": ORIGINS.includes(req.headers.get("Origin") ?? "") ? req.headers.get("Origin") : ORIGINS[0],
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

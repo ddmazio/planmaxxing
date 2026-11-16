@@ -10,7 +10,7 @@ const env = (k: string) => Deno.env.get(k) ?? ''
 const SUPABASE_URL = env('SUPABASE_URL')
 const KEYS = projectKeys(env)
 const db = makeDb(SUPABASE_URL, KEYS.service)
-const ORIGINS = ['https://planmaxxing.vercel.app', 'http://localhost:5173']
+const ORIGINS = ['https://twelvefold-app.vercel.app', 'https://planmaxxing.vercel.app', 'http://localhost:5173']
 
 const cors = (req: Request) => ({
   'Access-Control-Allow-Origin': ORIGINS.includes(req.headers.get('Origin') ?? '') ? req.headers.get('Origin')! : ORIGINS[0],

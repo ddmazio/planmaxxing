@@ -67,8 +67,8 @@ var env = (k) => Deno.env.get(k) ?? "";
 var SUPABASE_URL = env("SUPABASE_URL");
 var KEYS = projectKeys(env);
 var db = makeDb(SUPABASE_URL, KEYS.service);
-var APP = env("APP_URL") || "https://planmaxxing.vercel.app";
-var ORIGINS = ["https://planmaxxing.vercel.app", "http://localhost:5173"];
+var APP = env("APP_URL") || "https://twelvefold-app.vercel.app";
+var ORIGINS = ["https://twelvefold-app.vercel.app", "https://planmaxxing.vercel.app", "http://localhost:5173"];
 var BAN = "876000h";
 var cors = (req) => ({
   "Access-Control-Allow-Origin": ORIGINS.includes(req.headers.get("Origin") ?? "") ? req.headers.get("Origin") : ORIGINS[0],

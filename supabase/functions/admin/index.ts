@@ -10,8 +10,8 @@ const env = (k: string) => Deno.env.get(k) ?? ''
 const SUPABASE_URL = env('SUPABASE_URL')
 const KEYS = projectKeys(env)
 const db = makeDb(SUPABASE_URL, KEYS.service)
-const APP = env('APP_URL') || 'https://planmaxxing.vercel.app'
-const ORIGINS = ['https://planmaxxing.vercel.app', 'http://localhost:5173']
+const APP = env('APP_URL') || 'https://twelvefold-app.vercel.app'
+const ORIGINS = ['https://twelvefold-app.vercel.app', 'https://planmaxxing.vercel.app', 'http://localhost:5173']
 const BAN = '876000h' // ~100 anos: bloqueado até desbloquear
 
 const cors = (req: Request) => ({

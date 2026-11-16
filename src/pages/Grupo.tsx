@@ -86,7 +86,7 @@ export function Grupo() {
           <form className="card stack" onSubmit={join}>
             <span className="h3">Recebi um convite</span>
             <p className="caption muted" style={{ margin: 0 }}>Abra o link que mandaram para você, ou cole aqui.</p>
-            <input className="input" placeholder="https://planmaxxing.vercel.app/convite/…" value={link} onChange={(e) => setLink(e.target.value)} aria-label="Link do convite" />
+            <input className="input" placeholder="https://twelvefold-app.vercel.app/convite/…" value={link} onChange={(e) => setLink(e.target.value)} aria-label="Link do convite" />
             <button className="btn secondary" disabled={!link.trim()}>Entrar no grupo</button>
           </form>
         </div>
