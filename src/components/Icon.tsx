@@ -1,4 +1,5 @@
 const P: Record<string, string> = {
+  panel: 'M4 5h16v14H4zM9.5 5v14',
   home: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z',
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5',
   check: 'M5 12l5 5 9-10',

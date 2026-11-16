@@ -47,7 +47,7 @@ a { color: inherit; text-decoration: none; }
   .bottom-nav { display: none !important; }
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; font-family: var(--font-serif); font-size: 23px; font-weight: 400; }
-.brand-mark { width: 30px; height: 30px; border-radius: 9px; flex: none; display: block; }
+.brand-mark { flex: none; display: block; }
 .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; color: var(--text-primary); }
 .nav-item:hover { background: var(--bg-muted); }
 .nav-item.active { background: var(--ink); color: var(--on-ink); font-weight: 500; }
@@ -463,3 +463,20 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 
 /* títulos de seção em Instrument Serif, iguais em todas as telas */
 .section-title { font-family: var(--font-serif); font-weight: 400; font-size: 25px; line-height: 30px; letter-spacing: -0.005em; margin: 0; }
+
+/* marca com o ciclo embaixo e menu lateral recolhível (computador) */
+.brand { align-items: center; padding: 4px 4px 14px; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.brand-sub { font-family: var(--font-sans); font-size: 13px; line-height: 18px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.rail-toggle { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--text-secondary); flex: none; }
+.rail-toggle:hover { background: var(--bg-muted); color: var(--text-primary); }
+@media (min-width: 1024px) {
+  .sidebar { transition: width .2s ease; }
+  .app.rail .sidebar { width: 76px; padding-left: 10px; padding-right: 10px; }
+  .app.rail .brand { flex-direction: column; gap: 8px; padding: 0 0 10px; }
+  .app.rail .brand-text, .app.rail .nav-label, .app.rail .nav-section, .app.rail .side-search .grow, .app.rail .side-search .kbd, .app.rail .side-user .grow, .app.rail .side-user > svg { display: none; }
+  .app.rail .side-search { justify-content: center; padding: 0; }
+  .app.rail .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+  .app.rail .side-scroll { gap: 6px; }
+  .app.rail .side-user { justify-content: center; padding-left: 0; padding-right: 0; }
+}

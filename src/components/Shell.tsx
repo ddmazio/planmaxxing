@@ -6,7 +6,7 @@ import type { UndoMsg } from '../lib/undo'
 import { useAuth } from '../lib/auth'
 import { useRows, useToast } from '../lib/hooks'
 import type { Area, Cycle } from '../lib/types'
-import { currentCycle, weekOf, TOTAL_WEEKS } from '../lib/cycle'
+import { currentCycle, weekOf, EXEC_WEEKS, TOTAL_WEEKS } from '../lib/cycle'
 import { Icon } from './Icon'
 import { QuickAdd } from './QuickAdd'
 import { GOTO, Search } from './Search'
@@ -22,6 +22,9 @@ const SIDE: [string, string, string][] = [
 
 export function Shell() {
   const [quick, setQuick] = useState(false)
+  // menu lateral recolhível no computador (o app lembra a escolha)
+  const [rail, setRail] = useState(() => { try { return localStorage.getItem('tf-rail') === '1' } catch { return false } })
+  const toggleRail = () => setRail((r) => { try { localStorage.setItem('tf-rail', r ? '0' : '1') } catch { /* */ } return !r })
   const [search, setSearch] = useState(false)
   const toast = useToast()
   const { demo, profile } = useAuth()
@@ -65,22 +68,26 @@ export function Shell() {
   }, [])
 
   return (
-    <div className="app">
+    <div className={'app' + (rail ? ' rail' : '')}>
       <aside className="sidebar" aria-label="Navegação">
-        <div className="brand"><Logo />Twelvefold</div>
-        <button className="side-search" onClick={() => setSearch(true)}><Icon name="search" size={16} /><span className="grow">Buscar</span><span className="kbd">⌘K</span></button>
+        <div className="brand">
+          <Logo size={40} />
+          <span className="grow brand-text">Twelvefold<span className="brand-sub">{!cycle ? 'Sem ciclo em curso' : week === 0 ? `${cycle.name} · começa em breve` : week > TOTAL_WEEKS ? `${cycle.name} · terminou` : week > EXEC_WEEKS ? `${cycle.name} · semana de revisão` : `${cycle.name} · semana ${week} de ${EXEC_WEEKS}`}</span></span>
+          <button className="rail-toggle" onClick={toggleRail} aria-label={rail ? 'Abrir o menu' : 'Recolher o menu'} aria-expanded={!rail} title={rail ? 'Abrir o menu' : 'Recolher o menu'}><Icon name="panel" size={20} /></button>
+        </div>
+        <button className="side-search" onClick={() => setSearch(true)} title="Buscar (⌘K)"><Icon name="search" size={16} /><span className="grow">Buscar</span><span className="kbd">⌘K</span></button>
         <div className="side-scroll">
         <div className="nav-section mono faint">Principal</div>
         {SIDE.map(([to, label, icon]) => (
-          <NavLink key={to} to={to} className={() => 'nav-item' + (isActive(to) ? ' active' : '')}><Icon name={icon} />{label}</NavLink>
+          <NavLink key={to} to={to} title={label} className={() => 'nav-item' + (isActive(to) ? ' active' : '')}><Icon name={icon} /><span className="nav-label">{label}</span></NavLink>
         ))}
         <div className="nav-section mono faint">Áreas da vida</div>
         {areas.map((a) => (
-          <NavLink key={a.id} to={a.is_fixed ? '/financas' : `/ciclo/area/${a.id}`} className={() => 'nav-item' + (loc.pathname === `/ciclo/area/${a.id}` ? ' active' : '')} style={{ paddingTop: 6, paddingBottom: 6 }}>
-            <AreaIcon area={a} size={26} />{a.name}
+          <NavLink key={a.id} to={a.is_fixed ? '/financas' : `/ciclo/area/${a.id}`} title={a.name} className={() => 'nav-item' + (loc.pathname === `/ciclo/area/${a.id}` ? ' active' : '')} style={{ paddingTop: 6, paddingBottom: 6 }}>
+            <AreaIcon area={a} size={26} /><span className="nav-label">{a.name}</span>
           </NavLink>
         ))}
-        <NavLink to="/config/areas" className="nav-item faint" style={{ paddingTop: 8, paddingBottom: 8 }}><Icon name="plus" size={16} />Editar áreas</NavLink>
+        <NavLink to="/config/areas" title="Editar áreas" className="nav-item faint" style={{ paddingTop: 8, paddingBottom: 8 }}><Icon name="plus" size={16} /><span className="nav-label">Editar áreas</span></NavLink>
         </div>
         <NavLink to="/config" className={() => 'nav-item side-user' + (isActive('/config') ? ' active' : '')} aria-label="Configurações">
           <span className="avatar">{name.charAt(0).toUpperCase()}</span>
