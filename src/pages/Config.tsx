@@ -345,7 +345,7 @@ function LookPick({ color, icon, onChange }: { color: AreaColor; icon: string; o
         <span className="card stack look-pop" onMouseLeave={() => setOpen(false)}>
           <span className="mono muted">Cor</span>
           <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            {COLORS.map((c) => <button type="button" key={c} aria-label={c} aria-pressed={c === color} onClick={() => onChange({ color: c })} className="dot" style={{ width: 24, height: 24, background: `var(--${c}-ink)`, boxShadow: c === color ? '0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ink)' : undefined }} />)}
+            {COLORS.map((c) => <button type="button" key={c} aria-label={c} aria-pressed={c === color} onClick={() => onChange({ color: c })} className="dot" style={{ width: 24, height: 24, background: `var(--${c}-bg)`, boxShadow: c === color ? '0 0 0 2px var(--bg-surface), 0 0 0 4px var(--ink)' : undefined }} />)}
           </span>
           <span className="mono muted">Ícone</span>
           <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

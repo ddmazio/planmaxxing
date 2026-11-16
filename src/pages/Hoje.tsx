@@ -38,7 +38,7 @@ function useFold(id: string, initial: boolean) {
 function FoldHead({ title, count, open, onToggle, controls }: { title: string; count?: string; open: boolean; onToggle: () => void; controls: string }) {
   return (
     <button className="fold-head" aria-expanded={open} aria-controls={controls} onClick={onToggle}>
-      <h2 className="h2 grow">{title}</h2>
+      <h2 className="section-title grow">{title}</h2>
       {count && <span className="count-pill">{count}</span>}
       <Icon name="chevron" size={18} className={'fold-chev' + (open ? ' open' : '')} />
     </button>
@@ -285,7 +285,7 @@ export function Hoje() {
                 <Link key={a.id} to={`/ciclo/area/${a.id}`} className="list-row area-exec">
                   <AreaIcon area={a} size={28} />
                   <span className="grow">{a.name}</span>
-                  <div className="bar" style={{ width: 96 }}><span style={{ width: `${v ?? 0}%`, background: `var(--${a.color}-ink)` }} /></div>
+                  <div className="bar" style={{ width: 96 }}><span style={{ width: `${v ?? 0}%`, background: `var(--${a.color}-bg)` }} /></div>
                   <span className="mono" style={{ width: 36, textAlign: 'right' }}>{v == null ? '–' : `${v}%`}</span>
                 </Link>
               )

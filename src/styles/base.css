@@ -460,3 +460,6 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .cal-event.dragging { cursor: grabbing; z-index: 5; box-shadow: var(--shadow-float); opacity: 0.95; }
 .cal-free { position: absolute; left: 4px; right: 4px; border-radius: 12px; border: 1.5px dashed var(--text-tertiary); display: flex; justify-content: center; align-items: flex-start; padding-top: 8px; color: var(--text-secondary); opacity: 0.7; }
 .cal-free:hover { opacity: 1; background: var(--bg-muted); }
+
+/* títulos de seção em Instrument Serif, iguais em todas as telas */
+.section-title { font-family: var(--font-serif); font-weight: 400; font-size: 25px; line-height: 30px; letter-spacing: -0.005em; margin: 0; }

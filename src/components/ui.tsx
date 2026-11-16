@@ -64,7 +64,7 @@ export function Check({ done, onToggle, label }: { done: boolean; onToggle: () =
 }
 
 export function SectionHead({ title, action }: { title: string; action?: ReactNode }) {
-  return <div className="section-head"><h2 className="h3">{title}</h2>{action}</div>
+  return <div className="section-head"><h2 className="section-title">{title}</h2>{action}</div>
 }
 
 export function Toast({ msg }: { msg: string | null }) { return msg ? <div className="toast" role="status">{msg}</div> : null }

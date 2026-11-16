@@ -238,7 +238,7 @@ function GroupView({ group }: { group: Group }) {
                       <div key={g.goal_id} className="stack" style={{ gap: 2 }}>
                         <div className="row between caption"><span className="medium">{g.title}</span><span className="muted">{g.steps_total ? `${Math.round((g.steps_done / g.steps_total) * 100)}%` : ''}</span></div>
                         {g.done_definition && <span className="caption muted">{g.done_definition}</span>}
-                        {g.steps_total > 0 && <div className="bar"><span style={{ width: `${(g.steps_done / g.steps_total) * 100}%`, background: g.area_color ? `var(--${g.area_color}-ink)` : undefined }} /></div>}
+                        {g.steps_total > 0 && <div className="bar"><span style={{ width: `${(g.steps_done / g.steps_total) * 100}%`, background: g.area_color ? `var(--${g.area_color}-bg)` : undefined }} /></div>}
                         {g.week_steps.length > 0 && <span className="caption muted">Esta semana: {g.week_steps.join(' · ')}</span>}
                         {g.habits.length > 0 && <span className="caption muted">Hábitos: {g.habits.join(' · ')}</span>}
                       </div>

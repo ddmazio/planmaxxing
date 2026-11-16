@@ -69,7 +69,7 @@ export function Agenda() {
           <div className="seg" role="tablist" aria-label="Visão">
             {(['dia', 'semana', 'mes'] as View[]).map((v) => <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'on' : ''} onClick={() => setParam('v', v)}>{v === 'mes' ? 'Mês' : v[0].toUpperCase() + v.slice(1)}</button>)}
           </div>
-          <button className="btn primary small" onClick={() => setParam('novo', ymd(date))}><Icon name="plus" size={16} />Novo</button>
+          <button className="btn primary small desktop-only" onClick={() => setParam('novo', ymd(date))}><Icon name="plus" size={16} />Novo</button>
         </div>
       </header>
 
