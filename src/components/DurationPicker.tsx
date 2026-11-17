@@ -1,7 +1,7 @@
 import { addDays } from 'date-fns'
 import { fmt, fromYmd } from '../lib/dates'
 import { DURATIONS, DURATIONS_OWNER, newCycleDates } from '../lib/cycle'
-import { useIsAdmin } from '../pages/Admin'
+import { useFeature } from '../lib/app'
 
 const TIPS: Record<number, string> = {
   4: 'Bom para fechar o ano: uma meta só, passos curtos e uma revisão no fim.',
@@ -10,15 +10,15 @@ const TIPS: Record<number, string> = {
   12: 'O método original: 12 semanas de execução e 1 de revisão.',
 }
 
-/** Durações que esta conta pode escolher: 8 ou 12 para todos; a dona testa 4, 6, 8 ou 12. */
+/** Durações que esta conta pode escolher: 8 ou 12; com o recurso em teste "ciclo curto", também 4 e 6. */
 export function useDurations() {
-  const owner = useIsAdmin()
-  return { owner, options: owner ? DURATIONS_OWNER : DURATIONS }
+  const short = useFeature('ciclo_curto')
+  return { short, options: short ? DURATIONS_OWNER : DURATIONS }
 }
 
 /** Escolha da duração do ciclo, com a linha de semanas e as datas que mudam junto. */
 export function DurationPicker({ weeks, start, onChange }: { weeks: number; start: string; onChange: (w: number) => void }) {
-  const { owner, options } = useDurations()
+  const { short, options } = useDurations()
   const list = options.includes(weeks) ? options : [...options, weeks].sort((a, b) => a - b)
   const { ends_on } = newCycleDates(start, weeks)
   const execEnd = addDays(fromYmd(ends_on), -7)
@@ -29,7 +29,7 @@ export function DurationPicker({ weeks, start, onChange }: { weeks: number; star
           <span className="mono muted">Duração do ciclo</span>
           <span className="serif dur-value">{weeks} semanas</span>
         </div>
-        {owner && <span className="dur-pill">em teste · só você</span>}
+        {short && <span className="dur-pill">em teste</span>}
       </div>
       <div className="dur-options" role="radiogroup" aria-label="Duração do ciclo">
         {list.map((w) => (

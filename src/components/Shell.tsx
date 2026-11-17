@@ -1,4 +1,6 @@
 import { Logo } from './Logo'
+import { useApp } from '../lib/app'
+import { useIsAdmin } from '../pages/Admin'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import type { QuickKind } from '../lib/parse'
@@ -61,6 +63,15 @@ export function Shell() {
   useEffect(() => { const on = (e: Event) => setUndo((e as CustomEvent<UndoMsg>).detail); window.addEventListener('tf-undo', on); return () => window.removeEventListener('tf-undo', on) }, [])
   useEffect(() => { if (!undo) return; const t = setTimeout(() => setUndo((u) => (u?.id === undo.id ? null : u)), 4000); return () => clearTimeout(t) }, [undo])
   const name = profile?.display_name || 'Você'
+  // painel do app: aviso para todos, pedido de atualização e modo manutenção
+  const { settings: app } = useApp()
+  const owner = useIsAdmin()
+  const today = new Date().toISOString().slice(0, 10)
+  const noticeKey = app.announcement_at ?? ''
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem('tf-aviso') ?? '' } catch { return '' } })
+  const notice = app.announcement && (!app.announcement_until || app.announcement_until >= today) && hidden !== noticeKey ? app.announcement : null
+  const hideNotice = () => { setHidden(noticeKey); try { localStorage.setItem('tf-aviso', noticeKey) } catch { /* */ } }
+  const stale = !!app.refresh_after && app.refresh_after > __BUILD__
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine)
   useEffect(() => {
     const on = () => setOffline(!navigator.onLine)
@@ -69,6 +80,14 @@ export function Shell() {
   }, [])
 
   return (
+    app.maintenance && !owner ? (
+      <div className="maintenance">
+        <Logo size={56} />
+        <h1 className="serif" style={{ fontSize: 36, lineHeight: '40px', margin: 0 }}>Uma pausa rápida.</h1>
+        <p className="muted" style={{ margin: 0, maxWidth: 360 }}>O Twelvefold está passando por uma arrumação. Seus dados estão guardados. Volte daqui a pouco.</p>
+        <button className="btn secondary" onClick={() => window.location.reload()}>Tentar de novo</button>
+      </div>
+    ) :
     <div className={'app' + (rail ? ' rail' : '')}>
       <aside className="sidebar" aria-label="Navegação">
         <div className="brand">
@@ -108,6 +127,9 @@ export function Shell() {
           <button className="icon-btn mobile-only" aria-label="Buscar" onClick={() => setSearch(true)}><Icon name="search" size={19} /></button>
           <button className="btn primary new-btn desktop-only" onClick={() => openNew()}><Icon name="plus" size={16} />Novo</button>
         </div>
+        {notice && <div className="notice-bar" role="status"><Icon name="bell" size={14} /><span className="grow">{notice}</span><button className="notice-x" onClick={hideNotice} aria-label="Fechar aviso"><Icon name="x" size={14} /></button></div>}
+        {stale && <div className="notice-bar" role="status"><Icon name="repeat" size={14} /><span className="grow">Tem uma versão nova do app.</span><button className="btn small" onClick={() => window.location.reload()}>Atualizar</button></div>}
+        {app.maintenance && owner && <div className="notice-bar" role="status"><Icon name="lock" size={14} /><span className="grow">Modo manutenção ligado: as outras pessoas veem uma tela de pausa.</span></div>}
         {offline && <div className="offline-bar" role="status"><Icon name="repeat" size={14} />Sem conexão. O que já está na tela continua aqui; mudanças feitas agora podem não ser guardadas até a internet voltar.</div>}
         {demo && <div className="banner" style={{ maxWidth: 1224, margin: '0 auto 12px' }}>Modo demonstração: os dados ficam só neste aparelho. Ligue o Supabase para sincronizar e partilhar.</div>}
         <Outlet context={{ openQuick: () => openNew(), openSearch: () => setSearch(true), toast: toast.show }} />

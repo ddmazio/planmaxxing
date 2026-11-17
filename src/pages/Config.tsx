@@ -93,11 +93,16 @@ export function Config() {
         <span>Atualizações chegam sozinhas. Se algo parecer antigo, feche e abra o app de novo.</span>
       </div>
 
+      {isAdmin && <>
+        <span className="mono muted">Só você</span>
+        <div className="card flush list">
+          <Link className="list-row" to="/config/admin"><span className="owner-ico"><Icon name="lock" size={16} /></span><span className="grow stack" style={{ gap: 0, textAlign: 'left' }}><span className="medium">Painel do app</span><span className="caption muted">Pessoas, recursos em teste e avisos</span></span><span className="tag-pill lime">dona</span><Icon name="chevron" size={16} className="faint" /></Link>
+        </div>
+      </>}
       <span className="mono muted">Conta</span>
       <div className="card flush list">
         <Row icon="users" label="Grupo e convites" to="/grupo" />
         <Row icon="shield" label="Dados e privacidade" to="/config/dados" />
-        {isAdmin && <Row icon="star" label="Administração" value="convites e contas" to="/config/admin" />}
         <button className="list-row" onClick={signOut}><Icon name="logout" /><span className="grow" style={{ textAlign: 'left' }}>Sair</span></button>
       </div>
       <p className="caption faint row" style={{ margin: 0 }}><Icon name="shield" size={16} />Ninguém além de você lê seus dados. Finanças nunca aparecem para o grupo.</p>

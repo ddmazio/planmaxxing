@@ -11,6 +11,7 @@ import type { Area, CalEvent, ConflictSide, EventConflict } from '../lib/types'
 import { Sheet, Toggle } from '../components/ui'
 import { undoable } from '../lib/undo'
 import { Icon } from '../components/Icon'
+import { useFeature } from '../lib/app'
 
 type View = 'dia' | 'semana' | 'mes'
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
@@ -204,7 +205,8 @@ function TimeGrid({ days, events, paint, onOpen, onNew }: { days: Date[]; events
     el.addEventListener('touchmove', block, { passive: false })
     return () => el.removeEventListener('touchmove', block)
   }, [])
-  const movable = (e: CalEvent) => !(e.external_id?.startsWith('gcal:') && !e.sync_google)
+  const canDrag = useFeature('arrastar_agenda')
+  const movable = (e: CalEvent) => canDrag && !(e.external_id?.startsWith('gcal:') && !e.sync_google)
   const snap = (dy: number) => Math.round(((dy / HOUR_PX) * 60) / 15) * 15
   const finish = async (e: CalEvent) => {
     const d = dragRef.current; setDrag(null)

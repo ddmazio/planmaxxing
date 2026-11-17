@@ -16,6 +16,7 @@ import { Icon } from '../components/Icon'
 import type { ShellCtx } from '../components/Shell'
 import { useCycle } from './Ciclo'
 import { useCalendars } from '../lib/calendars'
+import { useFeature } from '../lib/app'
 
 const toggleStep = async (s: Step) => {
   await update<Step>('steps', s.id, { done_at: s.done_at ? null : new Date().toISOString() })
@@ -96,7 +97,8 @@ export function Hoje() {
   const current = timed.find((e) => e.starts_at <= nowIso && e.ends_at > nowIso)
   const next = timed.find((e) => e.starts_at > nowIso)
   const pendingSteps = weekSteps.filter((s) => !s.done_at)
-  const suggestion = pendingSteps[0] ? { title: pendingSteps[0].title, sub: goalOf(pendingSteps[0].goal_id)?.title ?? 'passo da semana', to: '/ciclo' }
+  const suggest = useFeature('sugestao_agora')
+  const suggestion = !suggest ? null : pendingSteps[0] ? { title: pendingSteps[0].title, sub: goalOf(pendingSteps[0].goal_id)?.title ?? 'passo da semana', to: '/ciclo' }
     : todays[0] ? { title: todays[0].title, sub: 'tarefa de hoje', to: `/tarefa/${todays[0].id}` } : null
 
   const [agendaOpen, toggleAgenda] = useFold('agenda', false)

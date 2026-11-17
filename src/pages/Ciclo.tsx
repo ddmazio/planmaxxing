@@ -9,6 +9,7 @@ import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, St
 import { TaskRow } from '../components/TaskRow'
 import { GoalWizard } from '../components/GoalWizard'
 import { DurationPicker } from '../components/DurationPicker'
+import { useApp } from '../lib/app'
 import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
@@ -48,7 +49,9 @@ function NovoCiclo() {
   const [step, setStep] = useState(0)
   const [name, setName] = useState(`Ciclo ${cycles.length + 1}`)
   const [start, setStart] = useState(ymd(weekStart(new Date(), profile?.week_starts_on ?? 1)))
-  const [weeks, setWeeks] = useState(12)
+  const { settings: appSettings } = useApp()
+  const [weeksPick, setWeeks] = useState<number | null>(null)
+  const weeks = weeksPick ?? appSettings.default_weeks
   const [words, setWords] = useState('')
   const [who, setWho] = useState('')
   const [goals, setGoals] = useState<{ area_id: string | null; title: string; done_definition: string }[]>([])

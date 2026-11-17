@@ -5,6 +5,7 @@ import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/dates'
 import { currentCycle, execWeeks, newCycleDates, score, totalWeeks, weekOf } from '../lib/cycle'
 import { DurationPicker } from '../components/DurationPicker'
+import { useApp } from '../lib/app'
 import { inMonth, DEFAULT_RULE, ym } from '../lib/finance'
 import { money, parseMoney } from '../lib/money'
 import { useAuth } from '../lib/auth'
@@ -93,6 +94,7 @@ export function Trimestre() {
   const nav = useNavigate()
   const { toast } = useOutletContext<ShellCtx>()
   const { profile } = useAuth()
+  const { settings: appSettings } = useApp()
   const { rows: cycles, loading } = useRows<Cycle>('cycles', { order: { column: 'starts_on', ascending: false } })
   const { rows: refl } = useRows<Reflection>('reflections', { eq: { kind: 'reset' } })
   const { rows: areasAll } = useRows<Area>('areas', { order: { column: 'position' } })
@@ -138,7 +140,7 @@ export function Trimestre() {
     return ymd(base < new Date() ? addDays(weekStart(new Date(), profile?.week_starts_on ?? 1), 7) : base)
   }
   const nextStart = newCycle?.starts_on ?? s.start ?? defStart()
-  const nextWeeks = newCycle ? execWeeks(newCycle) : s.weeks ?? 12
+  const nextWeeks = newCycle ? execWeeks(newCycle) : s.weeks ?? appSettings.default_weeks
   async function setNext(p: { weeks?: number; start?: string }) {
     const w = p.weeks ?? nextWeeks, st0 = p.start ?? nextStart
     set({ weeks: w, start: st0 })

@@ -7,6 +7,7 @@ import { CURRENCIES, CURRENCY_INFO, money, parseMoney } from '../lib/money'
 import { addDays, fmt, fromYmd, weekStart, ymd } from '../lib/dates'
 import { newCycleDates, execWeeks } from '../lib/cycle'
 import { DurationPicker } from '../components/DurationPicker'
+import { useApp } from '../lib/app'
 import { useCalendars, useGoogleLink } from '../lib/calendars'
 import type { Area, AreaColor, Cycle, Expense, Income, Reflection, Step } from '../lib/types'
 import { AreaIcon, Toggle } from '../components/ui'
@@ -51,7 +52,9 @@ export function Onboarding() {
   const { rows: cycles } = useRows<Cycle>('cycles')
   const existingCycle = cycles.find((c) => c.status !== 'closed')
   const [start, setStart] = useState(ymd(addDays(weekStart(new Date(), 1), 7)))
-  const [weeks, setWeeks] = useState(12)
+  const { settings: appSettings } = useApp()
+  const [weeksPick, setWeeks] = useState<number | null>(null)
+  const weeks = weeksPick ?? appSettings.default_weeks
   const [words, setWords] = useState<string[]>([])
   const [why, setWhy] = useState('')
   const [who, setWho] = useState<string[]>([])
