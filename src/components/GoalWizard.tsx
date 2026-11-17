@@ -32,9 +32,9 @@ export function habitDays(freq: string): number[] | null {
  * Nova meta em 3 passos, como no Figma: área (com inspiração), definição de pronto + tipo, passos por semana com a carga.
  * Usada no Plano do ciclo, na página da área, no onboarding e no ritual do trimestre.
  */
-export function GoalWizard({ cycleId, areas, existing, position, areaId, inspiration, index, maxGoals = 3, current = 1, onDone, onCancel, inline }: {
+export function GoalWizard({ cycleId, areas, existing, position, areaId, inspiration, index, maxGoals = 3, current = 1, weeks = EXEC_WEEKS, onDone, onCancel, inline }: {
   cycleId: string; areas: Area[]; existing: Step[]; position: number; areaId?: string
-  inspiration?: string[]; index?: number; maxGoals?: number; current?: number
+  inspiration?: string[]; index?: number; maxGoals?: number; current?: number; weeks?: number
   onDone: (g: Goal) => void; onCancel: () => void; inline?: boolean
 }) {
   const [step, setStep] = useState(0)
@@ -48,8 +48,8 @@ export function GoalWizard({ cycleId, areas, existing, position, areaId, inspira
   const [busy, setBusy] = useState(false)
   const pick = areas.filter((a) => !a.archived)
 
-  const load = Array.from({ length: EXEC_WEEKS }, (_, i) => existing.filter((s) => s.week === i + 1).length + drafts.filter((x) => i + 1 >= x.from && i + 1 <= x.to).length)
-  const avg = load.reduce((a, b) => a + b, 0) / EXEC_WEEKS
+  const load = Array.from({ length: weeks }, (_, i) => existing.filter((s) => s.week === i + 1).length + drafts.filter((x) => i + 1 >= x.from && i + 1 <= x.to).length)
+  const avg = load.reduce((a, b) => a + b, 0) / weeks
   const heavy = load.map((v, i) => [v, i + 1] as const).filter(([v]) => v >= 3 && v > avg * 1.6).map(([, w]) => w)
   const max = Math.max(4, ...load)
 

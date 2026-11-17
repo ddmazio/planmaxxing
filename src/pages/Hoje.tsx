@@ -7,7 +7,7 @@ import { addDays, fmt, fromYmd, greeting, hhmm, toIso, todayYmd, weekDays, ymd }
 import { isToday, postponeTask, toggleTask } from '../lib/tasks'
 import { undoable } from '../lib/undo'
 import { SwipeRow } from '../components/SwipeRow'
-import { EXEC_WEEKS, TOTAL_WEEKS, weekOf } from '../lib/cycle'
+import { execWeeks, totalWeeks, weekOf } from '../lib/cycle'
 import { areaExecution, cycleWeekDays, execEnd } from '../lib/execution'
 import type { CalEvent, Habit, HabitLog, List, Step, Task, TaskItem } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
@@ -63,6 +63,7 @@ export function Hoje() {
   const now = new Date()
   const { cycle, goals, steps, areas, loading } = useCycle()
   const week = cycle ? weekOf(cycle) : 0
+  const EXEC_WEEKS = execWeeks(cycle), TOTAL_WEEKS = totalWeeks(cycle)
   const inExec = !!cycle && week >= 1 && week <= EXEC_WEEKS
   const days = inExec ? cycleWeekDays(cycle!, week) : weekDays(now, profile?.week_starts_on ?? 1).map(ymd)
 
@@ -153,7 +154,7 @@ export function Hoje() {
               <span className="serif placar-n">{pct == null ? '–' : `${pct}%`}</span>
               <Icon name="chevron" size={18} className={'fold-chev' + (placarOpen ? ' open' : '')} />
             </button>
-            <div className="weeks placar-weeks" aria-label={`Semana ${week} de ${TOTAL_WEEKS}`}>
+            <div className="weeks placar-weeks" style={{ gridTemplateColumns: `repeat(${TOTAL_WEEKS}, 1fr)` }} aria-label={`Semana ${week} de ${TOTAL_WEEKS}`}>
               {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map((w) => <span key={w} className={w === week ? 'now' : w < week ? 'past' : w === TOTAL_WEEKS ? 'review' : ''} />)}
             </div>
             {placarOpen && (

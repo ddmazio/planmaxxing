@@ -3,7 +3,8 @@ import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { insert, update } from '../lib/db'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/dates'
-import { EXEC_WEEKS, currentCycle, newCycleDates, score, weekOf } from '../lib/cycle'
+import { currentCycle, execWeeks, newCycleDates, score, totalWeeks, weekOf } from '../lib/cycle'
+import { DurationPicker } from '../components/DurationPicker'
 import { inMonth, DEFAULT_RULE, ym } from '../lib/finance'
 import { money, parseMoney } from '../lib/money'
 import { useAuth } from '../lib/auth'
@@ -24,6 +25,7 @@ interface RT {
   notes: Record<string, { why: string; how: string }>
   improveText: string; improve: Record<string, string[]>
   focus: string[]; no: string[]; newCycleId?: string
+  weeks?: number; start?: string
   rewards: { t: string; when: string }[]
   dates: string[]; fun: { t: string; week: number }[]; weekend: string[]
   financeGoal: string; makePot: boolean
@@ -130,12 +132,24 @@ export function Trimestre() {
   const next = () => go(s.step + 1)
   const part = P1.includes(id) ? 1 : P2.includes(id) || id === 'pausa1' ? 2 : P3.includes(id) || id === 'pausa2' ? 3 : 0
 
+  // o próximo ciclo: começa quando o atual acaba (ou na próxima semana); a duração vem da escolha no início
+  const defStart = () => {
+    const base = old ? addDays(fromYmd(old.ends_on), 1) : addDays(weekStart(new Date(), profile?.week_starts_on ?? 1), 7)
+    return ymd(base < new Date() ? addDays(weekStart(new Date(), profile?.week_starts_on ?? 1), 7) : base)
+  }
+  const nextStart = newCycle?.starts_on ?? s.start ?? defStart()
+  const nextWeeks = newCycle ? execWeeks(newCycle) : s.weeks ?? 12
+  async function setNext(p: { weeks?: number; start?: string }) {
+    const w = p.weeks ?? nextWeeks, st0 = p.start ?? nextStart
+    set({ weeks: w, start: st0 })
+    if (newCycle) await update<Cycle>('cycles', newCycle.id, newCycleDates(st0, w))
+  }
+
   async function ensureCycle() {
     if (newCycle) return newCycle
-    const base = old ? addDays(fromYmd(old.ends_on), 1) : addDays(weekStart(new Date(), profile?.week_starts_on ?? 1), 7)
-    const start = ymd(base < new Date() ? addDays(weekStart(new Date(), profile?.week_starts_on ?? 1), 7) : base)
+    const start = nextStart
     const d = fromYmd(start)
-    const c = await insert<Cycle>('cycles', { name: `Q${Math.floor(d.getMonth() / 3) + 1} · ${d.getFullYear()}`, ...newCycleDates(start), status: 'planning', words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) })
+    const c = await insert<Cycle>('cycles', { name: `Q${Math.floor(d.getMonth() / 3) + 1} · ${d.getFullYear()}`, ...newCycleDates(start, nextWeeks), status: 'planning', words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) })
     setSt({ ...s, newCycleId: c.id })
     return c
   }
@@ -160,7 +174,7 @@ export function Trimestre() {
   }
 
   const prevWords = cycles.filter((c) => c.id !== s.newCycleId && c.words.length).slice(0, 4).reverse()
-  const avgScore = (() => { const w = Array.from({ length: EXEC_WEEKS }, (_, i) => score(oldSteps.filter((x) => x.week === i + 1))).filter((v): v is number => v != null); return w.length ? Math.round(w.reduce((a, b) => a + b, 0) / w.length) : null })()
+  const avgScore = (() => { const w = Array.from({ length: execWeeks(old) }, (_, i) => score(oldSteps.filter((x) => x.week === i + 1))).filter((v): v is number => v != null); return w.length ? Math.round(w.reduce((a, b) => a + b, 0) / w.length) : null })()
   const metGoals = oldGoals.filter((g) => { const x = oldSteps.filter((y) => y.goal_id === g.id); return x.length > 0 && x.every((y) => y.done_at) }).length
   const qn = P1.indexOf(id)
 
@@ -183,11 +197,11 @@ export function Trimestre() {
 
         {id === 'inicio' && (
           <div className="stack">
-            {old && <span className="mono muted">{weekOf(old) >= 13 ? `13ª semana · ${fmt(addDays(fromYmd(old.ends_on), -6), 'd MMM')} a ${fmt(fromYmd(old.ends_on), 'd MMM')}` : old.name}</span>}
-            <h1 className="serif-title" style={{ fontSize: 40, lineHeight: '44px' }}>{old ? `O ciclo ${old.name} ${weekOf(old) > EXEC_WEEKS ? 'terminou' : 'está acabando'}. Hora de olhar para trás e desenhar o próximo.` : 'Hora de desenhar o seu próximo trimestre.'}</h1>
+            {old && <span className="mono muted">{weekOf(old) >= totalWeeks(old) ? `semana de revisão · ${fmt(addDays(fromYmd(old.ends_on), -6), 'd MMM')} a ${fmt(fromYmd(old.ends_on), 'd MMM')}` : old.name}</span>}
+            <h1 className="serif-title" style={{ fontSize: 40, lineHeight: '44px' }}>{old ? `O ciclo ${old.name} ${weekOf(old) > execWeeks(old) ? 'terminou' : 'está acabando'}. Hora de olhar para trás e desenhar o próximo.` : 'Hora de desenhar o seu próximo trimestre.'}</h1>
             {old && (
               <div className="habit-stats">
-                <div className="card stack" style={{ gap: 0 }}><span className="big">{EXEC_WEEKS}</span><span className="caption muted">semanas</span></div>
+                <div className="card stack" style={{ gap: 0 }}><span className="big">{execWeeks(old)}</span><span className="caption muted">semanas</span></div>
                 <div className="card stack" style={{ gap: 0 }}><span className="big">{avgScore == null ? '–' : `${avgScore}%`}</span><span className="caption muted">placar médio</span></div>
                 <div className="card stack" style={{ gap: 0 }}><span className="big">{metGoals} de {oldGoals.length}</span><span className="caption muted">metas</span></div>
               </div>
@@ -198,6 +212,9 @@ export function Trimestre() {
                 <div key={t} className="list-row"><span className="ritual-num">{i + 1}</span><div className="stack" style={{ gap: 0 }}><span className="medium">{t}</span><span className="caption muted">{h}</span></div></div>
               ))}
             </div>
+            <span className="mono muted" style={{ marginTop: 8 }}>O próximo ciclo</span>
+            <DurationPicker weeks={nextWeeks} start={nextStart} onChange={(w) => setNext({ weeks: w })} />
+            <label className="field"><span>Começa em</span><input className="input" type="date" value={nextStart} onChange={(e) => e.target.value && setNext({ start: e.target.value })} /></label>
             <p className="caption muted" style={{ margin: 0 }}>Dá para pausar a qualquer momento. O app guarda onde você parou.</p>
           </div>
         )}
@@ -327,7 +344,7 @@ export function Trimestre() {
           </div>
         )}
 
-        {id === 'metas' && <Metas s={s} areas={areas} newCycle={newCycle} goals={newGoals} steps={newSteps} ensureCycle={ensureCycle} />}
+        {id === 'metas' && <Metas s={s} weeks={nextWeeks} areas={areas} newCycle={newCycle} goals={newGoals} steps={newSteps} ensureCycle={ensureCycle} />}
 
         {id === 'nao' && (
           <div className="stack">
@@ -381,7 +398,7 @@ export function Trimestre() {
               {s.fun.map((f, i) => (
                 <div key={i} className="list-row"><span className="grow">{f.t}</span>
                   <select className="input" style={{ width: 'auto' }} value={f.week} aria-label={`Semana de ${f.t}`} onChange={(e) => set({ fun: s.fun.map((x, j) => (j === i ? { ...x, week: Number(e.target.value) } : x)) })}>
-                    <option value={0}>sem semana</option>{Array.from({ length: EXEC_WEEKS }, (_, w) => <option key={w} value={w + 1}>talvez S{w + 1}</option>)}</select>
+                    <option value={0}>sem semana</option>{Array.from({ length: nextWeeks }, (_, w) => <option key={w} value={w + 1}>talvez S{w + 1}</option>)}</select>
                   <button className="faint" aria-label={`Tirar ${f.t}`} onClick={() => set({ fun: s.fun.filter((_, j) => j !== i) })}><Icon name="x" size={14} /></button></div>
               ))}
               <form className="list-row" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('t') as HTMLInputElement; if (f.value.trim()) set({ fun: [...s.fun, { t: f.value.trim(), week: 0 }] }); f.value = '' }}>
@@ -435,12 +452,12 @@ export function Trimestre() {
 
         {id === 'resumo' && (
           <div className="stack">
-            <span className="mono muted">{newCycle ? `Ciclo ${newCycle.name} · ${fmt(fromYmd(newCycle.starts_on), 'd MMM')} a ${fmt(addDays(fromYmd(newCycle.starts_on), EXEC_WEEKS * 7 - 1), 'd MMM')} · ${EXEC_WEEKS} semanas` : 'Resumo'}</span>
+            <span className="mono muted">{newCycle ? `Ciclo ${newCycle.name} · ${fmt(fromYmd(newCycle.starts_on), 'd MMM')} a ${fmt(addDays(fromYmd(newCycle.starts_on), execWeeks(newCycle) * 7 - 1), 'd MMM')} · ${execWeeks(newCycle)} semanas` : 'Resumo'}</span>
             {s.who.length > 0 && <p className="serif-title" style={{ fontSize: 30 }}>“{s.who.slice(0, 3).map((x) => x.replace(/[.;]+$/, '')).join('. ')}.”</p>}
             <div className="card flush list">
               {[
                 ['Metas', `${newGoals.length}${newGoals.length ? ' · ' + [...new Set(newGoals.map((g) => areas.find((a) => a.id === g.area_id)?.name).filter(Boolean))].join(', ') : ''}`],
-                ['Passos', `${newSteps.length} nas ${EXEC_WEEKS} semanas`],
+                ['Passos', `${newSteps.length} nas ${nextWeeks} semanas`],
                 ['Hábitos novos', String(s.focusWeek.filter((x) => { const f = parseFreq(x); return f && habitDays(f) && !/por dia/.test(f) }).length)],
                 ['Datas', `${s.dates.length} marcadas`],
                 ['Recompensas', String(s.rewards.length)],
@@ -546,7 +563,7 @@ function Notas({ areas, s, set }: { areas: Area[]; s: RT; set: (p: Partial<RT>) 
   )
 }
 
-function Metas({ s, areas, newCycle, goals, steps, ensureCycle }: { s: RT; areas: Area[]; newCycle?: Cycle; goals: Goal[]; steps: Step[]; ensureCycle: () => Promise<Cycle> }) {
+function Metas({ s, weeks, areas, newCycle, goals, steps, ensureCycle }: { s: RT; weeks: number; areas: Area[]; newCycle?: Cycle; goals: Goal[]; steps: Step[]; ensureCycle: () => Promise<Cycle> }) {
   const [open, setOpen] = useState(false)
   const [cid, setCid] = useState<string | null>(null)
   const KIND = { project: 'Projeto', habit: 'Hábito', both: 'Projeto + hábito' }
@@ -568,7 +585,7 @@ function Metas({ s, areas, newCycle, goals, steps, ensureCycle }: { s: RT; areas
       ) : <Empty>Nenhuma meta ainda.</Empty>}
       <button className="btn secondary" disabled={goals.length >= 5} onClick={async () => { const c = await ensureCycle(); setCid(c.id); setOpen(true) }}><Icon name="plus" size={16} />Criar meta (abre o passo a passo)</button>
       <span className="caption muted">Recomendado: até 3 metas por ciclo.</span>
-      {open && cid && <GoalWizard cycleId={cid} areas={areas} existing={steps} position={goals.length} index={goals.length} inspiration={insp} areaId={s.focus[goals.length]}
+      {open && cid && <GoalWizard cycleId={cid} weeks={weeks} areas={areas} existing={steps} position={goals.length} index={goals.length} inspiration={insp} areaId={s.focus[goals.length]}
         onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />}
     </div>
   )

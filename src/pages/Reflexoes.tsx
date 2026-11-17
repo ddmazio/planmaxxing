@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd } from '../lib/dates'
-import { EXEC_WEEKS, currentCycle, score } from '../lib/cycle'
+import { execWeeks, currentCycle, score } from '../lib/cycle'
 import type { Cycle, Goal, Reflection, Step } from '../lib/types'
 import { Empty, SectionHead } from '../components/ui'
 import { PageHeader } from '../components/Shell'
@@ -39,10 +39,10 @@ export function Reflexoes() {
   const cycleCards: Card[] = cycles.filter((c) => c.id !== cur?.id || c.status === 'closed').map((c) => {
     const gs = goals.filter((g) => g.cycle_id === c.id)
     const st = steps.filter((s) => gs.some((g) => g.id === s.goal_id))
-    const weekly = Array.from({ length: EXEC_WEEKS }, (_, i) => score(st.filter((s) => s.week === i + 1))).filter((v): v is number => v != null)
+    const weekly = Array.from({ length: execWeeks(c) }, (_, i) => score(st.filter((s) => s.week === i + 1))).filter((v): v is number => v != null)
     const avg = weekly.length ? Math.round(weekly.reduce((a, b) => a + b, 0) / weekly.length) : null
     const met = gs.filter((g) => { const x = st.filter((s) => s.goal_id === g.id); return x.length > 0 && x.every((s) => s.done_at) }).length
-    const final = refl.find((r) => r.cycle_id === c.id && r.kind === 'review' && (r.week ?? 0) > EXEC_WEEKS)
+    const final = refl.find((r) => r.cycle_id === c.id && r.kind === 'review' && (r.week ?? 0) > execWeeks(c))
     const body = [avg != null && `Placar médio ${avg}%`, gs.length && `${met} de ${gs.length} meta${gs.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')
     return {
       key: c.id, kind: 'CICLO' as const, when: `${c.name} · ${fmt(fromYmd(c.starts_on), 'MMM')} a ${fmt(fromYmd(c.ends_on), 'MMM')}`, sort: c.ends_on, score: avg,

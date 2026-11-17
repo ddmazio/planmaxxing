@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { insert, remove, update } from '../lib/db'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, todayYmd, ymd } from '../lib/dates'
-import { EXEC_WEEKS, currentCycle } from '../lib/cycle'
+import { EXEC_WEEKS, currentCycle, execWeeks } from '../lib/cycle'
 import { execEnd } from '../lib/execution'
 import type { Area, Cycle, Habit, HabitLog } from '../lib/types'
 import { Empty, Sheet } from '../components/ui'
@@ -101,7 +101,7 @@ export function Habito() {
       </div>
 
       <div className="card stack">
-        <span className="mono muted" style={{ textTransform: 'uppercase' }}>{cycle ? `${cycle.name} · ${EXEC_WEEKS} semanas` : 'Últimas 12 semanas'}</span>
+        <span className="mono muted" style={{ textTransform: 'uppercase' }}>{cycle ? `${cycle.name} · ${execWeeks(cycle)} semanas` : 'Últimas 12 semanas'}</span>
         <div className="habit-cal" role="grid" aria-label="Calendário do hábito">
           <div className="hc-row" role="row">{WEEK.map((d, i) => <span key={i} className="mono faint hc-head" role="columnheader">{LETTER[d]}</span>)}</div>
           {weeks.map((w) => (

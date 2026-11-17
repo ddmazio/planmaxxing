@@ -4,10 +4,11 @@ import { insert, remove, removeWhere, update } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/dates'
-import { EXEC_WEEKS, TOTAL_WEEKS, currentCycle, daysUntil, newCycleDates, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
+import { execWeeks, totalWeeks, currentCycle, daysUntil, newCycleDates, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
 import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, Step, Task } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
 import { GoalWizard } from '../components/GoalWizard'
+import { DurationPicker } from '../components/DurationPicker'
 import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
@@ -47,13 +48,14 @@ function NovoCiclo() {
   const [step, setStep] = useState(0)
   const [name, setName] = useState(`Ciclo ${cycles.length + 1}`)
   const [start, setStart] = useState(ymd(weekStart(new Date(), profile?.week_starts_on ?? 1)))
+  const [weeks, setWeeks] = useState(12)
   const [words, setWords] = useState('')
   const [who, setWho] = useState('')
   const [goals, setGoals] = useState<{ area_id: string | null; title: string; done_definition: string }[]>([])
   const [draft, setDraft] = useState({ area_id: '', title: '', done_definition: '' })
   const [busy, setBusy] = useState(false)
   const focus = areas.filter((a) => a.focus && !a.is_fixed)
-  const dates = newCycleDates(start)
+  const dates = newCycleDates(start, weeks)
 
   async function create() {
     setBusy(true)
@@ -75,10 +77,11 @@ function NovoCiclo() {
 
       {step === 0 && (
         <div className="stack">
-          <div className="card soft caption">Um ciclo tem 12 semanas para fazer acontecer e 1 semana para olhar para trás. Um ano cabe em 12 semanas: sem prazo distante, cada semana conta.</div>
+          <div className="card soft caption">Um ciclo tem algumas semanas para fazer acontecer e 1 semana para olhar para trás. Sem prazo distante, cada semana conta.</div>
           <label className="field"><span>Nome do ciclo</span><input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} /></label>
           <label className="field"><span>Começa em</span><input type="date" className="input" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
-          <p className="caption muted" style={{ margin: 0 }}>Termina em {fmt(fromYmd(dates.ends_on), "d 'de' MMMM 'de' yyyy")}, com a semana 13 para revisão.</p>
+          <DurationPicker weeks={weeks} start={start} onChange={setWeeks} />
+          <p className="caption muted" style={{ margin: 0 }}>Termina em {fmt(fromYmd(dates.ends_on), "d 'de' MMMM 'de' yyyy")}, com a semana {weeks + 1} para revisão.</p>
           <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={!name.trim()} onClick={() => setStep(1)}>Continuar</button>
         </div>
       )}
@@ -137,6 +140,7 @@ function NovoCiclo() {
 function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle: Cycle }) {
   const { goals, steps, areas } = data
   const now = weekOf(cycle)
+  const EXEC_WEEKS = execWeeks(cycle), TOTAL_WEEKS = totalWeeks(cycle)
   const execNow = Math.min(Math.max(now, 1), EXEC_WEEKS)
   const [week, setWeek] = useState(execNow)
   const [newGoal, setNewGoal] = useState(false)
@@ -180,7 +184,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
         <div><span className="big">{habits.length}</span><span className="caption muted">hábito{habits.length === 1 ? '' : 's'}</span></div>
       </div>
 
-      <div className="weeks" aria-label={`Semana ${now} de ${TOTAL_WEEKS}`}>
+      <div className="weeks" style={{ gridTemplateColumns: `repeat(${TOTAL_WEEKS}, 1fr)` }} aria-label={`Semana ${now} de ${TOTAL_WEEKS}`}>
         {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map((w) => (
           <span key={w} className={w === now ? 'now' : w < now ? 'past' : w === TOTAL_WEEKS ? 'review' : ''} title={`Semana ${w}`} />
         ))}
@@ -188,7 +192,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
 
       {(ended || now >= EXEC_WEEKS) && (
         <Link to="/ciclo/trimestre" className="card lime row between" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <div className="stack" style={{ gap: 2 }}><span className="medium">{ended ? 'As 13 semanas acabaram.' : now === TOTAL_WEEKS ? 'É a 13ª semana: hora do ritual do trimestre.' : 'O ciclo está acabando.'}</span>
+          <div className="stack" style={{ gap: 2 }}><span className="medium">{ended ? `As ${TOTAL_WEEKS} semanas acabaram.` : now === TOTAL_WEEKS ? 'É a semana de revisão: hora do ritual.' : 'O ciclo está acabando.'}</span>
             <span className="caption">Olhar para trás, decidir e organizar o próximo ciclo · 3 partes, no seu ritmo.</span></div>
           <span className="btn primary small">Fazer o ritual do trimestre</span>
         </Link>
@@ -233,7 +237,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
 
         <div className="stack">
           <SectionHead title="Metas" action={<button className="btn secondary small" onClick={() => setNewGoal(true)}><Icon name="plus" size={14} />Meta</button>} />
-          {goals.length ? goals.map((g) => <GoalCard key={g.id} goal={g} steps={steps.filter((s) => s.goal_id === g.id)} area={areaOf(g.area_id)} current={execNow} />)
+          {goals.length ? goals.map((g) => <GoalCard key={g.id} goal={g} steps={steps.filter((s) => s.goal_id === g.id)} area={areaOf(g.area_id)} current={execNow} weeks={EXEC_WEEKS} />)
             : <Empty>Sem metas ainda. Escolha 1 a 3 para este ciclo.</Empty>}
 
           <SectionHead title="Hábitos" action={<span className="caption muted">abra para ver o calendário</span>} />
@@ -301,7 +305,7 @@ function ScoreCard({ label, value, hint }: { label: string; value: number | null
   )
 }
 
-function GoalCard({ goal, steps, area, current }: { goal: Goal; steps: Step[]; area?: Area; current: number }) {
+function GoalCard({ goal, steps, area, current, weeks }: { goal: Goal; steps: Step[]; area?: Area; current: number; weeks: number }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [week, setWeek] = useState(current)
@@ -336,7 +340,7 @@ function GoalCard({ goal, steps, area, current }: { goal: Goal; steps: Step[]; a
           <form className="row" style={{ gap: 8 }} onSubmit={async (e) => { e.preventDefault(); const t = title.trim(); if (!t) return; setTitle(''); await insert<Step>('steps', { goal_id: goal.id, title: t, week, position: steps.length }) }}>
             <input className="input grow" placeholder="Novo passo" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} aria-label="Novo passo" />
             <select className="input" style={{ width: 88 }} value={week} onChange={(e) => setWeek(Number(e.target.value))} aria-label="Semana">
-              {Array.from({ length: EXEC_WEEKS }, (_, i) => i + 1).map((w) => <option key={w} value={w}>S{w}</option>)}
+              {Array.from({ length: weeks }, (_, i) => i + 1).map((w) => <option key={w} value={w}>S{w}</option>)}
             </select>
             <button className="icon-btn ink" aria-label="Adicionar passo" disabled={!title.trim()}><Icon name="plus" size={18} /></button>
           </form>
@@ -357,7 +361,7 @@ function GoalSheet({ open, onClose, cycle, areas, position, areaId }: { open: bo
   // inspiração: as melhorias que você escreveu no ritual do trimestre
   const insp = (() => { try { const st = JSON.parse(refl.find((r) => r.prompt === 'ritual-trimestre')?.answers[0] ?? '{}'); return Object.values(st.improve ?? {}).flat().filter(Boolean) as string[] } catch { return [] } })()
   const now = weekOf(cycle)
-  return <GoalWizard cycleId={cycle.id} areas={areas} existing={steps} position={position} areaId={areaId} inspiration={insp} current={Math.min(Math.max(now, 1), EXEC_WEEKS)} onDone={onClose} onCancel={onClose} />
+  return <GoalWizard cycleId={cycle.id} areas={areas} existing={steps} position={position} areaId={areaId} inspiration={insp} current={Math.min(Math.max(now, 1), execWeeks(cycle))} weeks={execWeeks(cycle)} onDone={onClose} onCancel={onClose} />
 }
 
 function VisionSheet({ open, onClose, cycle }: { open: boolean; onClose: () => void; cycle: Cycle }) {
@@ -401,8 +405,8 @@ export function AreaPage() {
   if (!area) return <div className="page"><p className="muted">{loading ? 'Carregando…' : 'Área não encontrada.'}</p></div>
   const areaGoals = goals.filter((g) => g.area_id === area.id)
   const focus = areaGoals.length > 0
-  const current = cycle ? Math.min(Math.max(weekOf(cycle), 1), EXEC_WEEKS) : 1
-  const inExec = !!cycle && weekOf(cycle) >= 1 && weekOf(cycle) <= EXEC_WEEKS
+  const current = cycle ? Math.min(Math.max(weekOf(cycle), 1), execWeeks(cycle)) : 1
+  const inExec = !!cycle && weekOf(cycle) >= 1 && weekOf(cycle) <= execWeeks(cycle)
   const goalIds = new Set(areaGoals.map((g) => g.id))
   const weekSteps = inExec ? steps.filter((s) => goalIds.has(s.goal_id) && s.week === current) : []
   const last7 = Array.from({ length: 7 }, (_, i) => ymd(addDays(now, i - 6)))

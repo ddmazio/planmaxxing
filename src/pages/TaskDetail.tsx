@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { fmt, fromYmd, todayYmd } from '../lib/dates'
 import { REPEAT_LABEL, toggleTask } from '../lib/tasks'
-import { EXEC_WEEKS, weekOf } from '../lib/cycle'
+import { execWeeks, weekOf } from '../lib/cycle'
 import type { Area, List, ListMember, Step, Task, TaskComment, TaskItem } from '../lib/types'
 import { Check, Sheet, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -135,12 +135,12 @@ export function TaskDetail({ task, onClose }: { task: Task; onClose: () => void 
         <button className="caption danger" onClick={async () => { if (confirm('Excluir esta tarefa?')) { await remove('tasks', task.id); onClose() } }}>Excluir</button>
       </div>
 
-      {cycle && <StepSheet open={toStep} onClose={() => setToStep(false)} task={task} goals={goals} current={Math.min(Math.max(weekOf(cycle), 1), EXEC_WEEKS)} />}
+      {cycle && <StepSheet open={toStep} onClose={() => setToStep(false)} task={task} goals={goals} current={Math.min(Math.max(weekOf(cycle), 1), execWeeks(cycle))} weeks={execWeeks(cycle)} />}
     </div>
   )
 }
 
-function StepSheet({ open, onClose, task, goals, current }: { open: boolean; onClose: () => void; task: Task; goals: { id: string; title: string }[]; current: number }) {
+function StepSheet({ open, onClose, task, goals, current, weeks }: { open: boolean; onClose: () => void; task: Task; goals: { id: string; title: string }[]; current: number; weeks: number }) {
   const [picked, setGoal] = useState('')
   const goal = picked || goals[0]?.id || ''
   const [week, setWeek] = useState(current)
@@ -151,7 +151,7 @@ function StepSheet({ open, onClose, task, goals, current }: { open: boolean; onC
         <select className="input" value={goal} onChange={(e) => setGoal(e.target.value)}>{goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
       <label className="field"><span>Semana</span>
         <select className="input" value={week} onChange={(e) => setWeek(Number(e.target.value))}>
-          {Array.from({ length: EXEC_WEEKS }, (_, i) => i + 1).filter((w) => w >= current).map((w) => <option key={w} value={w}>Semana {w}{w === current ? ' (esta)' : ''}</option>)}
+          {Array.from({ length: weeks }, (_, i) => i + 1).filter((w) => w >= current).map((w) => <option key={w} value={w}>Semana {w}{w === current ? ' (esta)' : ''}</option>)}
         </select></label>
       <button className="btn primary" disabled={!goal} onClick={async () => {
         const st = await insert<Step>('steps', { goal_id: goal, title: task.title, week, detail: task.due_on ? `até ${fmt(fromYmd(task.due_on), 'EEE, d MMM')}` : null, position: 999, done_at: task.completed_at })

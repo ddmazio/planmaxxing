@@ -6,7 +6,7 @@ import type { UndoMsg } from '../lib/undo'
 import { useAuth } from '../lib/auth'
 import { useRows, useToast } from '../lib/hooks'
 import type { Area, Cycle } from '../lib/types'
-import { currentCycle, weekOf, EXEC_WEEKS, TOTAL_WEEKS } from '../lib/cycle'
+import { currentCycle, weekOf, execWeeks, totalWeeks } from '../lib/cycle'
 import { Icon } from './Icon'
 import { QuickAdd } from './QuickAdd'
 import { GOTO, Search } from './Search'
@@ -32,6 +32,7 @@ export function Shell() {
   const { rows: cycles } = useRows<Cycle>('cycles')
   const cycle = currentCycle(cycles)
   const week = cycle ? weekOf(cycle) : 0
+  const EW = execWeeks(cycle), TW = totalWeeks(cycle)
   const loc = useLocation()
   const cicloZone = ['/ciclo', '/reflexoes', '/grupo', '/convite', '/habito', '/semana', '/trimestre'].some((p) => loc.pathname.startsWith(p))
   const isTab = (to: string) => (to === '/ciclo' ? cicloZone : loc.pathname.startsWith(to))
@@ -72,7 +73,7 @@ export function Shell() {
       <aside className="sidebar" aria-label="Navegação">
         <div className="brand">
           <Logo size={40} />
-          <span className="grow brand-text">Twelvefold<span className="brand-sub">{!cycle ? 'Sem ciclo em curso' : week === 0 ? `${cycle.name} · começa em breve` : week > TOTAL_WEEKS ? `${cycle.name} · terminou` : week > EXEC_WEEKS ? `${cycle.name} · semana de revisão` : `${cycle.name} · semana ${week} de ${EXEC_WEEKS}`}</span></span>
+          <span className="grow brand-text">Twelvefold<span className="brand-sub">{!cycle ? 'Sem ciclo em curso' : week === 0 ? `${cycle.name} · começa em breve` : week > TW ? `${cycle.name} · terminou` : week > EW ? `${cycle.name} · semana de revisão` : `${cycle.name} · semana ${week} de ${EW}`}</span></span>
           <button className="rail-toggle" onClick={toggleRail} aria-label={rail ? 'Abrir o menu' : 'Recolher o menu'} aria-expanded={!rail} title={rail ? 'Abrir o menu' : 'Recolher o menu'}><Icon name="panel" size={20} /></button>
         </div>
         <button className="side-search" onClick={() => setSearch(true)} title="Buscar (⌘K)"><Icon name="search" size={16} /><span className="grow">Buscar</span><span className="kbd">⌘K</span></button>
@@ -93,7 +94,7 @@ export function Shell() {
           <span className="avatar">{name.charAt(0).toUpperCase()}</span>
           <span className="grow stack" style={{ gap: 0 }}>
             <span className="medium" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-            <span className="caption muted">{!cycle ? 'Sem ciclo em curso' : week === 0 ? `${cycle.name} · começa em breve` : week > TOTAL_WEEKS ? `${cycle.name} · terminou` : `${cycle.name} · semana ${week}`}</span>
+            <span className="caption muted">{!cycle ? 'Sem ciclo em curso' : week === 0 ? `${cycle.name} · começa em breve` : week > TW ? `${cycle.name} · terminou` : `${cycle.name} · semana ${week}`}</span>
           </span>
           <Icon name="settings" size={16} className="faint" />
         </NavLink>

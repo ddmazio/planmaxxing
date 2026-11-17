@@ -4,7 +4,7 @@ import { insert, rpc, select, update, DEMO } from '../lib/db'
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, todayYmd, ymd } from '../lib/dates'
-import { EXEC_WEEKS, score, weekOf } from '../lib/cycle'
+import { execWeeks, score, weekOf } from '../lib/cycle'
 import { cycleWeekDays } from '../lib/execution'
 import type { CalEvent, Checkin, Cheer, Group, Habit, HabitLog, Reflection, Step } from '../lib/types'
 import { AreaTag, Empty, Toggle } from '../components/ui'
@@ -33,6 +33,7 @@ export function Ritual() {
   const { toast } = useOutletContext<ShellCtx>()
   const [params] = useSearchParams()
   const now = cycle ? weekOf(cycle) : 0
+  const EXEC_WEEKS = execWeeks(cycle)
   // fecha a semana em curso (ou a escolhida) e planeja a seguinte
   const W = Math.min(Math.max(Number(params.get('semana')) || now, 1), EXEC_WEEKS)
   const P = W < EXEC_WEEKS ? W + 1 : null
@@ -120,7 +121,7 @@ export function Ritual() {
         </div>
 
         {phase === 'plan' && P && step === 0 && <Atrasadas W={W} P={P} steps={steps} goals={goals} pRange={range(pDays)} />}
-        {phase === 'plan' && P && step === 1 && <SuaSemana P={P} steps={steps} goals={goals} areas={areas} habits={habits} events={events} pRange={range(pDays)} />}
+        {phase === 'plan' && P && step === 1 && <SuaSemana P={P} weeks={EXEC_WEEKS} steps={steps} goals={goals} areas={areas} habits={habits} events={events} pRange={range(pDays)} />}
         {phase === 'plan' && P && step === 2 && <Distribuir P={P} days={pDays} steps={steps} goals={goals} habits={habits} events={events} />}
 
         {phase === 'close' && step === 0 && (
@@ -229,8 +230,8 @@ function Atrasadas({ W, P, steps, goals, pRange }: { W: number; P: number; steps
 }
 
 // ---------------------------------------------------------------- planejar 2: sua semana
-function SuaSemana({ P, steps, goals, areas, habits, events, pRange }: {
-  P: number; steps: Step[]; goals: { id: string; title: string; area_id: string | null }[]; areas: import('../lib/types').Area[]; habits: Habit[]; events: CalEvent[]; pRange: string
+function SuaSemana({ P, weeks, steps, goals, areas, habits, events, pRange }: {
+  P: number; weeks: number; steps: Step[]; goals: { id: string; title: string; area_id: string | null }[]; areas: import('../lib/types').Area[]; habits: Habit[]; events: CalEvent[]; pRange: string
 }) {
   const [all, setAll] = useState(false)
   const [title, setTitle] = useState('')
@@ -260,7 +261,7 @@ function SuaSemana({ P, steps, goals, areas, habits, events, pRange }: {
             <div key={s.id} className="list-row">
               <div className="grow stack" style={{ gap: 2 }}><span>{s.title}</span><span className="caption muted">{s.detail ? `${s.detail} · ` : ''}{g?.title}</span></div>
               <AreaTag area={areas.find((a) => a.id === g?.area_id)} />
-              {P < EXEC_WEEKS && <button className="btn ghost small" onClick={() => update<Step>('steps', s.id, { week: P + 1 })} aria-label={`Passar ${s.title} para a semana ${P + 1}`}>→ S{P + 1}</button>}
+              {P < weeks && <button className="btn ghost small" onClick={() => update<Step>('steps', s.id, { week: P + 1 })} aria-label={`Passar ${s.title} para a semana ${P + 1}`}>→ S{P + 1}</button>}
             </div>
           )
         })}

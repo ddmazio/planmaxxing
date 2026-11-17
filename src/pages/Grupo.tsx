@@ -5,7 +5,7 @@ import { insert, removeWhere, rpc, touch, update, updateWhere, DEMO } from '../l
 import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { weekStart } from '../lib/dates'
-import { score, weekOf } from '../lib/cycle'
+import { execWeeks, score, weekOf } from '../lib/cycle'
 import type { Area, Checkin, Cheer, Group, GroupInvite, GroupMember, List, ListMember, Task } from '../lib/types'
 import { AreaIcon, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -130,7 +130,7 @@ function GroupView({ group }: { group: Group }) {
   // placar automático: passos feitos na semana atual do seu ciclo
   const { cycle, steps, goals } = useCycle()
   const cw = cycle ? weekOf(cycle) : 0
-  const auto = cycle && cw >= 1 && cw <= 12 ? score(steps.filter((s) => s.week === cw)) : null
+  const auto = cycle && cw >= 1 && cw <= execWeeks(cycle) ? score(steps.filter((s) => s.week === cw)) : null
   const myCheck = mine[0]
   const [intent, setIntent] = useState<string | null>(null)
   const [worked, setWorked] = useState<string | null>(null)

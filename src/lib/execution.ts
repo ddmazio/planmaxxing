@@ -1,5 +1,5 @@
 import { addDays, fromYmd, ymd } from './dates'
-import { EXEC_WEEKS } from './cycle'
+import { execWeeks } from './cycle'
 import type { Area, Cycle, Goal, Habit, HabitLog, Step } from './types'
 
 /** Dias da semana do ciclo (7 datas yyyy-MM-dd), a partir do início do ciclo. */
@@ -9,7 +9,7 @@ export function cycleWeekDays(c: Cycle, week: number) {
 }
 
 /** Último dia das 12 semanas de execução (sem a semana de revisão). */
-export const execEnd = (c: Cycle) => ymd(addDays(fromYmd(c.starts_on), EXEC_WEEKS * 7 - 1))
+export const execEnd = (c: Cycle) => ymd(addDays(fromYmd(c.starts_on), execWeeks(c) * 7 - 1))
 
 /**
  * Execução de cada área na semana: passos da semana feitos + hábitos marcados até hoje,

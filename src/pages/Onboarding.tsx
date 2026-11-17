@@ -5,7 +5,8 @@ import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { CURRENCIES, CURRENCY_INFO, money, parseMoney } from '../lib/money'
 import { addDays, fmt, fromYmd, weekStart, ymd } from '../lib/dates'
-import { newCycleDates, EXEC_WEEKS } from '../lib/cycle'
+import { newCycleDates, execWeeks } from '../lib/cycle'
+import { DurationPicker } from '../components/DurationPicker'
 import { useCalendars, useGoogleLink } from '../lib/calendars'
 import type { Area, AreaColor, Cycle, Expense, Income, Reflection, Step } from '../lib/types'
 import { AreaIcon, Toggle } from '../components/ui'
@@ -50,6 +51,7 @@ export function Onboarding() {
   const { rows: cycles } = useRows<Cycle>('cycles')
   const existingCycle = cycles.find((c) => c.status !== 'closed')
   const [start, setStart] = useState(ymd(addDays(weekStart(new Date(), 1), 7)))
+  const [weeks, setWeeks] = useState(12)
   const [words, setWords] = useState<string[]>([])
   const [why, setWhy] = useState('')
   const [who, setWho] = useState<string[]>([])
@@ -62,7 +64,7 @@ export function Onboarding() {
   const fixed = bills.reduce((a, b) => a + (parseMoney(b.val) ?? 0), 0)
   const $ = (c: number) => money(c, cur)
   const month1 = `${ymd(new Date()).slice(0, 7)}-01`
-  const dates = newCycleDates(start)
+  const dates = newCycleDates(start, weeks)
 
   async function saveFinance() {
     setBusy(true)
@@ -262,11 +264,9 @@ export function Onboarding() {
             <>
               <span className="mono muted">Novo ciclo · {quarter(start)}</span>
               <h1 className="serif onb-title">Como vai ser este ciclo?</h1>
-              <div className="grid2" style={{ gap: 12 }}>
-                <label className="field"><span>Começa em</span><input className="input" type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
-                <div className="field"><span>Duração</span><div className="input" style={{ display: 'flex', alignItems: 'center' }}>{EXEC_WEEKS} semanas</div></div>
-              </div>
-              <span className="caption muted">+ 13ª semana de review: {fmt(addDays(fromYmd(dates.ends_on), -6), 'd MMM')} a {fmt(fromYmd(dates.ends_on), 'd MMM')}</span>
+              <DurationPicker weeks={weeks} start={start} onChange={setWeeks} />
+              <label className="field"><span>Começa em</span><input className="input" type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
+              <span className="caption muted">+ semana {weeks + 1} de revisão: {fmt(addDays(fromYmd(dates.ends_on), -6), 'd MMM')} a {fmt(fromYmd(dates.ends_on), 'd MMM')}</span>
               <span className="mono muted" style={{ marginTop: 8 }}>3 palavras para este ciclo</span>
               <div className="wordchips">{words.map((w) => <button key={w} onClick={() => setWords(words.filter((x) => x !== w))} aria-label={`Tirar ${w}`}>{w} ✕</button>)}</div>
               {words.length < 3 && <form onSubmit={(e) => { e.preventDefault(); const f = (e.currentTarget.elements.namedItem('w') as HTMLInputElement); const v = f.value.trim(); if (v && !words.includes(v)) setWords([...words, v]); f.value = '' }}>
@@ -282,7 +282,7 @@ export function Onboarding() {
 
         {step === 6 && (existingCycle ? (
           <>
-            <GoalWizard inline cycleId={existingCycle.id} areas={areas} existing={steps} position={0} index={0} onDone={finish} onCancel={finish} />
+            <GoalWizard inline weeks={execWeeks(existingCycle)} cycleId={existingCycle.id} areas={areas} existing={steps} position={0} index={0} onDone={finish} onCancel={finish} />
             <button className="caption muted" style={{ alignSelf: 'center' }} onClick={finish}>Pular e ir para o Hoje</button>
           </>
         ) : <p className="muted">Criando o ciclo…</p>)}
