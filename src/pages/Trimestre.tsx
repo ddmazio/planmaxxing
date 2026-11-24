@@ -183,6 +183,12 @@ export function Trimestre() {
   const avgScore = (() => { const w = Array.from({ length: execWeeks(old) }, (_, i) => score(oldSteps.filter((x) => x.week === i + 1))).filter((v): v is number => v != null); return w.length ? Math.round(w.reduce((a, b) => a + b, 0) / w.length) : null })()
   const metGoals = oldGoals.filter((g) => { const x = oldSteps.filter((y) => y.goal_id === g.id); return x.length > 0 && x.every((y) => y.done_at) }).length
   const cur = subList[s.sub]
+  // palavras do ciclo: aceita várias de uma vez, separadas por vírgula; guarda até 3
+  const addWords = (text: string) => {
+    const next = [...sRef.current.words]
+    for (const w of text.split(',').map((x) => x.trim().slice(0, 60)).filter(Boolean)) if (next.length < 3 && !next.some((x) => x.toLowerCase() === w.toLowerCase())) next.push(w)
+    if (next.length !== sRef.current.words.length) set({ words: next })
+  }
 
   return (
     <div className="page wide ritual-page solo">
@@ -250,8 +256,11 @@ export function Trimestre() {
           <div className="stack">
             <h1 className="serif-title">3 palavras para inspirar este ciclo</h1>
             <div className="wordchips">{s.words.map((w) => <button key={w} onClick={() => set({ words: s.words.filter((x) => x !== w) })} aria-label={`Tirar ${w}`}>{w} ✕</button>)}</div>
-            {s.words.length < 3 && <form onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('w') as HTMLInputElement; const v = f.value.trim().toLowerCase(); if (v && !s.words.includes(v)) set({ words: [...s.words, v] }); f.value = '' }}>
-              <input name="w" className="input" placeholder={['coragem', 'constância', 'leveza'][s.words.length]} maxLength={30} aria-label="Palavra do ciclo" /></form>}
+            {s.words.length < 3 && <form onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('w') as HTMLInputElement; addWords(f.value); f.value = '' }}>
+              <input name="w" className="input" placeholder={s.words.length ? ['coragem', 'constância', 'leveza'][s.words.length] : 'Escreva e aperte Enter (ou separe por vírgula)'} maxLength={200} aria-label="Palavras do ciclo"
+                onChange={(e) => { const v = e.target.value; if (v.includes(',')) { const i = v.lastIndexOf(','); addWords(v.slice(0, i)); e.target.value = v.slice(i + 1).trimStart() } }}
+                onBlur={(e) => { if (e.target.value.trim()) { addWords(e.target.value); e.target.value = '' } }} /></form>}
+            <span className="caption muted">Pode ser palavra ou expressão, do tamanho que quiser.</span>
             {cycles.some((c) => c.id !== s.newCycleId && c.words.length) && <>
               <span className="mono muted">Ciclos anteriores</span>
               <div className="card flush list">{cycles.filter((c) => c.id !== s.newCycleId && c.words.length).slice(0, 4).map((c) => <div key={c.id} className="list-row"><span className="mono muted" style={{ width: 80 }}>{c.name}</span><span>{c.words.join(' · ')}</span></div>)}</div>
