@@ -22,7 +22,7 @@ interface AreaRefl { score: number | null; good: Win[]; bad: Miss[]; improve: st
 type Kind = 'project' | 'habit' | 'both'
 type ItemType = 'projeto' | 'habito' | 'tarefa' | 'evento'
 interface Meta { id: string; area: string; t: string; kind: Kind; done: string }
-interface Item { id: string; area: string; meta: string | null; t: string; type: ItemType; date?: string; days?: number[]; week?: number }
+interface Item { id: string; area: string; meta: string | null; t: string; type: ItemType; date?: string; days?: number[]; week?: number; weekEnd?: number }
 interface RT {
   v: 2; step: number; sub: number
   reflect: string[]; created: string[]; refl: Record<string, AreaRefl>
@@ -152,10 +152,12 @@ export function Trimestre() {
       for (const [i, it] of itemsWeek.filter((x) => x.t.trim() && s.focus.includes(x.area)).entries()) {
         const title = it.t.trim().slice(0, 200)
         const g = it.meta ? gid[it.meta] : undefined
-        if (it.type === 'projeto' && g) await insert<Step>('steps', { goal_id: g, title, week: it.week ?? 1, detail: null, position: i })
+        const w0 = it.week ?? 1, w1 = Math.max(w0, it.weekEnd ?? w0), n = w1 - w0 + 1
+        // projeto que dura várias semanas vira um passo em cada semana, para contar no placar de todas
+        if (it.type === 'projeto' && g) for (let w = w0; w <= w1; w++) await insert<Step>('steps', { goal_id: g, title, week: w, detail: n > 1 ? `semana ${w - w0 + 1} de ${n}` : null, position: i })
         else if (it.type === 'habito') await insert<Habit>('habits', { title: title.slice(0, 120), area_id: it.area, days: it.days?.length ? it.days : [0, 1, 2, 3, 4, 5, 6], archived: false })
         else if (it.type === 'evento' && it.date) await insert<CalEvent>('events', { title, starts_at: toIso(it.date), ends_at: toIso(ymd(addDays(fromYmd(it.date), 1))), all_day: true, kind: 'appointment', area_id: it.area, location: null, notes: null, reminder_minutes: null })
-        else await insert<Task>('tasks', { title, notes: null, list_id: null, important: false, position: 0, area_id: it.area, due_on: weekDay(it.week ?? 1) })
+        else await insert<Task>('tasks', { title, notes: n > 1 ? `Da semana ${w0} à ${w1} do ciclo.` : null, list_id: null, important: false, position: 0, area_id: it.area, due_on: n > 1 ? ymd(addDays(fromYmd(weekDay(w1)), 6)) : weekDay(w0) })
       }
       // áreas: nota, melhorias, visão e foco
       for (const a of areas) {
@@ -314,9 +316,10 @@ export function Trimestre() {
 /** Semana proposta para cada projeto e tarefa sem semana: espalha os de cada área pelo ciclo. Eventos ficam na semana da data. */
 function proposeWeeks(items: Item[], weeks: number): Item[] {
   const byArea: Record<string, Item[]> = {}
-  for (const it of items) if ((it.type === 'projeto' || it.type === 'tarefa') && !it.week) (byArea[it.area] ??= []).push(it)
+  for (const it of items) if (it.type === 'projeto' || it.type === 'tarefa') (byArea[it.area] ??= []).push(it)
   const auto: Record<string, number> = {}
-  for (const list of Object.values(byArea)) list.forEach((it, i) => { auto[it.id] = Math.min(weeks, 1 + Math.floor((i * weeks) / list.length)) })
+  // a proposta usa a posição de cada item entre todos da área, então mexer num não embaralha os outros
+  for (const list of Object.values(byArea)) list.forEach((it, i) => { if (!it.week) auto[it.id] = Math.min(weeks, 1 + Math.floor((i * weeks) / list.length)) })
   return items.map((it) => (auto[it.id] ? { ...it, week: auto[it.id] } : it))
 }
 
@@ -626,7 +629,9 @@ function Distribuir({ s, set, areas, items, weeks, start, busy, onFinish, reflec
   const weekOfDate = (d: string) => Math.max(1, Math.min(weeks, Math.floor((fromYmd(d).getTime() - fromYmd(start).getTime()) / (7 * 86400e3)) + 1))
   const habits = live.filter((i) => i.type === 'habito')
   const dated = live.filter((i) => i.type !== 'habito')
-  const setWeek = (id: string, w: number) => set({ items: s.items.map((i) => (i.id === id ? { ...i, week: w } : i)) })
+  const setWeek = (id: string, w: number) => set({ items: s.items.map((i) => (i.id === id ? { ...i, week: w, weekEnd: Math.max(w, i.weekEnd ?? w) } : i)) })
+  const setEnd = (id: string, w: number) => { const start = items.find((x) => x.id === id)?.week ?? 1; set({ items: s.items.map((i) => (i.id === id ? { ...i, week: start, weekEnd: w } : i)) }) }
+  const span = (i: Item) => [i.week ?? 1, Math.max(i.week ?? 1, i.weekEnd ?? i.week ?? 1)] as const
   const typeOf = (i: Item) => (i.type === 'projeto' && !i.meta ? 'tarefa' : i.type === 'evento' && !i.date ? 'tarefa' : i.type)
   const metas = s.metas.filter((m) => m.t.trim() && s.focus.includes(m.area))
   return (
@@ -648,7 +653,8 @@ function Distribuir({ s, set, areas, items, weeks, start, busy, onFinish, reflec
       </>}
       {Array.from({ length: weeks }, (_, w) => w + 1).map((w) => {
         const list = dated.filter((i) => (i.type === 'evento' && i.date ? weekOfDate(i.date) : i.week ?? 1) === w)
-        if (!list.length) return null
+        const going = dated.filter((i) => !(i.type === 'evento' && i.date) && span(i)[0] < w && span(i)[1] >= w)
+        if (!list.length && !going.length) return null
         return (
           <div key={w} className="stack" style={{ gap: 6 }}>
             <span className="mono muted">Semana {w} · {fmt(addDays(fromYmd(start), (w - 1) * 7), 'd MMM')}</span>
@@ -659,10 +665,22 @@ function Distribuir({ s, set, areas, items, weeks, start, busy, onFinish, reflec
                   <span className="grow" style={{ minWidth: 140 }}>{i.t}</span>
                   <AreaTag area={area(i.area)} />
                   {i.type === 'evento' && i.date ? <span className="caption muted">{fmt(fromYmd(i.date), 'd MMM')}</span> : (
-                    <select className="input" style={{ width: 'auto' }} value={i.week ?? 1} aria-label={`Semana de ${i.t}`} onChange={(e) => setWeek(i.id, Number(e.target.value))}>
-                      {Array.from({ length: weeks }, (_, k) => <option key={k} value={k + 1}>Semana {k + 1}</option>)}
-                    </select>
+                    <span className="row" style={{ gap: 6 }}>
+                      <select className="input" style={{ width: 'auto' }} value={i.week ?? 1} aria-label={`Semana em que ${i.t} começa`} onChange={(e) => setWeek(i.id, Number(e.target.value))}>
+                        {Array.from({ length: weeks }, (_, k) => <option key={k} value={k + 1}>Semana {k + 1}</option>)}
+                      </select>
+                      <select className="input" style={{ width: 'auto' }} value={span(i)[1]} aria-label={`Até que semana vai ${i.t}`} onChange={(e) => setEnd(i.id, Number(e.target.value))}>
+                        {Array.from({ length: weeks - (i.week ?? 1) + 1 }, (_, k) => (i.week ?? 1) + k).map((k) => <option key={k} value={k}>{k === (i.week ?? 1) ? 'só esta semana' : `até a semana ${k}`}</option>)}
+                      </select>
+                    </span>
                   )}
+                </div>
+              ))}
+              {going.map((i) => (
+                <div key={i.id} className="list-row faint">
+                  <span className="tag-pill">continua</span>
+                  <span className="grow">{i.t}</span>
+                  <span className="caption muted">semanas {span(i)[0]} a {span(i)[1]}</span>
                 </div>
               ))}
             </div>
