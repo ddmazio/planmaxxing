@@ -541,3 +541,7 @@ details.others[open] > summary .caption::after { content: ' ▴'; }
 .nota-range.unset::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--text-tertiary); }
 .nota-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--ink), 0 0 0 5px var(--focus); }
 .bottom-nav .plus-gap { width: 64px; height: 50px; }
+.date-pick { width: 100%; }
+.date-pick.on { background: var(--lime-soft); }
+.pick-check { width: 24px; height: 24px; border-radius: 50%; flex: none; display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px var(--border); color: var(--on-ink); }
+.pick-check.on { background: var(--ink); box-shadow: none; }

@@ -31,6 +31,7 @@ interface RT {
   words: string[]; who: string[]
   metas: Meta[]; items: Item[]
   ideas: string[]
+  keyDates?: { id: string; t: string; d: string; e?: string }[]
   newCycleId?: string; weeks?: number; start?: string; finished?: boolean
 }
 const empty = (): RT => ({ v: 2, step: 0, sub: 0, reflect: [], created: [], refl: {}, focus: [], vision: {}, rewards: [], words: [], who: [], metas: [], items: [], ideas: [] })
@@ -167,7 +168,7 @@ export function Trimestre() {
         await update<Area>('areas', a.id, patch)
       }
       const base = { status: 'active' as const, words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) }
-      try { await update<Cycle>('cycles', c.id, { ...base, rewards: s.rewards.filter((r) => s.focus.includes(r.area)), ideas: s.ideas.slice(0, 60) }) }
+      try { await update<Cycle>('cycles', c.id, { ...base, rewards: s.rewards.filter((r) => s.focus.includes(r.area)), ideas: s.ideas.slice(0, 60), key_dates: (s.keyDates ?? []).slice(0, 120) }) }
       catch { await update<Cycle>('cycles', c.id, base) } // banco ainda sem as colunas novas: guarda o resto
       if (old && old.id !== c.id) await update<Cycle>('cycles', old.id, { status: 'closed' })
       const fin = { ...s, newCycleId: c.id, finished: true }
@@ -274,7 +275,7 @@ export function Trimestre() {
         {id === 'metas' && (cur ? <MetasArea key={cur.id} area={cur} vision={s.vision[cur.id] ?? ''} s={s} set={set} />
           : <Empty>Escolha as áreas de foco primeiro.</Empty>)}
 
-        {id === 'datas' && <Datas from={nextStart} to={nextEnd} weeks={nextWeeks} />}
+        {id === 'datas' && <Datas from={nextStart} to={nextEnd} weeks={nextWeeks} picked={s.keyDates ?? []} onPick={(v) => set({ keyDates: v })} />}
 
         {id === 'ideias' && (
           <div className="stack">
@@ -554,41 +555,59 @@ function MetasArea({ area, vision, s, set }: { area: Area; vision: string; s: RT
   )
 }
 
-function Datas({ from, to, weeks }: { from: string; to: string; weeks: number }) {
+type KeyDate = { id: string; t: string; d: string; e?: string }
+function Datas({ from, to, weeks, picked, onPick }: { from: string; to: string; weeks: number; picked: KeyDate[]; onPick: (v: KeyDate[]) => void }) {
   const { rows: events } = useRows<CalEvent>('events', { gte: { starts_at: toIso(from) }, lt: { starts_at: toIso(to) }, order: { column: 'starts_at' } })
   const [kind, setKind] = useState('Evento')
+  const [showAll, setShowAll] = useState(false)
   const kindOf = (e: CalEvent) => /anivers/i.test(e.title) ? 'aniversário' : /feriado|dia d[aoe]s? |natal|carnaval|p[aá]scoa|ano novo|independ|rep[uú]blica|consci[eê]ncia|corpo de deus|finados|imaculada/i.test(e.title) ? 'feriado' : /viagem|f[eé]rias|voo|pausa/i.test(e.title) ? 'viagem' : e.all_day ? 'evento' : 'compromisso'
   const big = events.filter((e) => e.all_day || new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime() >= 3 * 3600e3 || /anivers|feriado|viagem|entrevista|apresenta|prova|exame/i.test(e.title))
+  // o que se repete muito (sono, aula fixa, rotina) não é data do ciclo: fica escondido até pedir
+  const count: Record<string, number> = {}
+  for (const e of big) { const k = e.title.trim().toLowerCase(); count[k] = (count[k] ?? 0) + 1 }
+  const repeated = (e: CalEvent) => (count[e.title.trim().toLowerCase()] ?? 0) >= 3
+  const hidden = big.filter(repeated).length
+  const list = big.filter((e) => showAll || !repeated(e) || picked.some((p) => p.id === e.id))
   const weekOfDate = (d: Date) => Math.min(weeks + 1, Math.floor((d.getTime() - fromYmd(from).getTime()) / (7 * 86400e3)) + 1)
   const months: { key: string; label: string; list: CalEvent[] }[] = []
   for (let d = fromYmd(from); d <= fromYmd(to); d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
     const key = fmt(d, 'yyyy-MM')
-    months.push({ key, label: fmt(d, "MMMM 'de' yyyy"), list: big.filter((e) => fmt(new Date(e.starts_at), 'yyyy-MM') === key) })
+    months.push({ key, label: fmt(d, "MMMM 'de' yyyy"), list: list.filter((e) => fmt(new Date(e.starts_at), 'yyyy-MM') === key) })
   }
-  const span = (e: CalEvent) => { const a = new Date(e.starts_at), b = new Date(new Date(e.ends_at).getTime() - (e.all_day ? 1 : 0)); return a.toDateString() === b.toDateString() ? fmt(a, 'd') : `${fmt(a, 'd')}–${fmt(b, 'd')}` }
+  const endDay = (e: CalEvent) => new Date(new Date(e.ends_at).getTime() - (e.all_day ? 1 : 0))
+  const span = (e: CalEvent) => { const a = new Date(e.starts_at), b = endDay(e); return a.toDateString() === b.toDateString() ? fmt(a, 'd') : `${fmt(a, 'd')}–${fmt(b, 'd')}` }
+  const snap = (e: CalEvent): KeyDate => { const a = ymd(new Date(e.starts_at)), b = ymd(endDay(e)); return { id: e.id, t: e.title.slice(0, 120), d: a, ...(b !== a ? { e: b } : {}) } }
+  const toggle = (e: CalEvent) => onPick(picked.some((p) => p.id === e.id) ? picked.filter((p) => p.id !== e.id) : [...picked, snap(e)].sort((x, y) => x.d.localeCompare(y.d)))
   return (
     <div className="stack">
       <h1 className="serif-title">O que acontece neste ciclo?</h1>
-      <p className="muted" style={{ margin: 0 }}>Eventos, feriados, viagens, aniversários e datas importantes, mês a mês. Vêm das agendas que você mostra no app (como os feriados que você assina no Google). Complete o que faltar para não esquecer nada.</p>
+      <p className="muted" style={{ margin: 0 }}>Vêm das suas agendas. Marque só o que importa para o ciclo (eventos, feriados, viagens, aniversários, prazos): isso aparece no Plano do ciclo. O resto continua só na Agenda.</p>
+      <span className="caption medium">{picked.length} data{picked.length === 1 ? '' : 's'} marcada{picked.length === 1 ? '' : 's'} para o ciclo</span>
       {months.map((m) => (
         <div key={m.key} className="stack" style={{ gap: 6 }}>
           <span className="mono muted">{m.label}</span>
           {m.list.length ? (
             <div className="card flush list">
-              {m.list.map((e) => (
-                <div key={e.id} className="list-row">
-                  <div className="date-chip"><span className="mono">{fmt(new Date(e.starts_at), 'EEE').toUpperCase()}</span><span className="medium">{span(e)}</span></div>
-                  <div className="grow stack" style={{ gap: 0 }}><span>{e.title}</span><span className="caption muted">{kindOf(e)} · semana {weekOfDate(new Date(e.starts_at))}</span></div>
-                </div>
-              ))}
+              {m.list.map((e) => {
+                const on = picked.some((p) => p.id === e.id)
+                return (
+                  <button key={e.id} type="button" className={'list-row date-pick' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggle(e)}>
+                    <div className="date-chip"><span className="mono">{fmt(new Date(e.starts_at), 'EEE').toUpperCase()}</span><span className="medium">{span(e)}</span></div>
+                    <div className="grow stack" style={{ gap: 0, textAlign: 'left' }}><span>{e.title}</span><span className="caption muted">{kindOf(e)} · semana {weekOfDate(new Date(e.starts_at))}</span></div>
+                    <span className={'pick-check' + (on ? ' on' : '')} aria-hidden>{on && <Icon name="check" size={14} />}</span>
+                  </button>
+                )
+              })}
             </div>
-          ) : <span className="caption muted">Nada marcado ainda.</span>}
+          ) : <span className="caption muted">Nada neste mês.</span>}
         </div>
       ))}
+      {hidden > 0 && <button className="caption muted" style={{ alignSelf: 'flex-start' }} onClick={() => setShowAll(!showAll)}>{showAll ? 'Esconder o que se repete' : `Mostrar também o que se repete (${hidden}, como rotinas)`}</button>}
       <form className="card row" style={{ flexWrap: 'wrap', gap: 8 }} onSubmit={async (e) => {
         e.preventDefault(); const f = e.currentTarget; const t = (f.elements.namedItem('t') as HTMLInputElement).value.trim(); const d = (f.elements.namedItem('d') as HTMLInputElement).value; if (!t || !d) return
         const title = kind === 'Aniversário' && !/anivers/i.test(t) ? `Aniversário: ${t}` : kind === 'Viagem' && !/viagem/i.test(t) ? `Viagem: ${t}` : t
-        await insert<CalEvent>('events', { title, starts_at: toIso(d), ends_at: toIso(ymd(addDays(fromYmd(d), 1))), all_day: true, kind: 'appointment', area_id: null, location: null, notes: null, reminder_minutes: null }); f.reset()
+        const ev = await insert<CalEvent>('events', { title, starts_at: toIso(d), ends_at: toIso(ymd(addDays(fromYmd(d), 1))), all_day: true, kind: 'appointment', area_id: null, location: null, notes: null, reminder_minutes: null })
+        onPick([...picked, { id: ev.id, t: title.slice(0, 120), d }].sort((x, y) => x.d.localeCompare(y.d))); f.reset()
       }}>
         <Icon name="plus" size={16} className="faint" />
         <select className="input" style={{ width: 'auto' }} value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Tipo da data">{['Evento', 'Aniversário', 'Viagem', 'Feriado'].map((k) => <option key={k}>{k}</option>)}</select>
@@ -596,7 +615,7 @@ function Datas({ from, to, weeks }: { from: string; to: string; weeks: number })
         <input name="d" type="date" className="input" style={{ width: 160 }} aria-label="Dia" defaultValue={from} min={from} max={to} />
         <button className="btn secondary small">Adicionar</button>
       </form>
-      <span className="caption muted">Aniversários que se repetem todo ano: marque como “anual” na Agenda depois, se a sua agenda do Google ainda não tiver.</span>
+      <span className="caption muted">O que você adiciona aqui vai para a Agenda e já entra marcado.</span>
     </div>
   )
 }

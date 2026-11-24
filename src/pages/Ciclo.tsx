@@ -185,6 +185,21 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
             </div>
           ) : <Empty>Escreva as palavras do ciclo e quem você quer ser no fim dele.</Empty>}
 
+          {(cycle.key_dates?.length ?? 0) > 0 && <>
+            <SectionHead title="Datas do ciclo" action={<Link className="caption muted" to="/agenda">agenda →</Link>} />
+            <div className="card flush list">
+              {cycle.key_dates!.map((k) => {
+                const d = fromYmd(k.d), past = k.d < todayYmd()
+                return (
+                  <div key={k.id} className={'list-row' + (past ? ' faint' : '')}>
+                    <div className="date-chip"><span className="mono">{fmt(d, 'MMM').toUpperCase()}</span><span className="medium">{fmt(d, 'd')}{k.e ? `–${fmt(fromYmd(k.e), 'd')}` : ''}</span></div>
+                    <span className="grow">{k.t}</span>
+                    <span className="caption muted">semana {Math.max(1, Math.floor((d.getTime() - fromYmd(cycle.starts_on).getTime()) / (7 * 86400e3)) + 1)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </>}
           {(cycle.rewards?.length ?? 0) > 0 && <>
             <SectionHead title="Recompensas" />
             <div className="card flush list">
