@@ -5,7 +5,7 @@ import { RITUAL_NAMES, RITUAL_ORDER, RITUAL_P1, RITUAL_P2, RITUAL_P3 } from '../
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, weekStart, ymd } from '../lib/dates'
 import { currentCycle, execWeeks, newCycleDates, score, totalWeeks, weekOf } from '../lib/cycle'
-import { AREA_CATALOG, presetArea } from '../lib/areas'
+import { AREA_CATALOG, normName, presetArea } from '../lib/areas'
 import { DurationPicker } from '../components/DurationPicker'
 import { useApp } from '../lib/app'
 import { useAuth } from '../lib/auth'
@@ -313,7 +313,13 @@ function proposeWeeks(items: Item[], weeks: number): Item[] {
 function AreasPick({ areas, s, set }: { areas: Area[]; s: RT; set: (p: Partial<RT>) => void }) {
   const [busy, setBusy] = useState('')
   const known = new Set(AREA_CATALOG.map((p) => presetArea(p, areas)?.id).filter(Boolean))
-  const mine = areas.filter((a) => !known.has(a.id))
+  // repetidas: outra área que cai na mesma opção do catálogo (ex.: "Self improvement" e "Eu")
+  const dup = (a: Area) => !known.has(a.id) && !a.is_fixed && AREA_CATALOG.some((p) => p.match.test(normName(a.name)))
+  const mine = areas.filter((a) => !known.has(a.id) && !dup(a))
+  // as repetidas que este ritual criou e você não escolheu saem do menu
+  useEffect(() => {
+    for (const a of areas) if (dup(a) && s.created.includes(a.id) && !s.reflect.includes(a.id)) update<Area>('areas', a.id, { archived: true, focus: false }).catch(() => {})
+  }, [areas.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const toggle = (a: Area) => set({ reflect: s.reflect.includes(a.id) ? s.reflect.filter((x) => x !== a.id) : [...s.reflect, a.id] })
   const create = async (key: string) => {
     const p = AREA_CATALOG.find((x) => x.key === key)!

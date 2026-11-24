@@ -15,10 +15,10 @@ export const AREA_CATALOG: AreaPreset[] = [
   { key: 'application', name: 'Application', color: 'estudos', icon: 'cap', hint: 'candidaturas para mestrado ou graduação', match: /^application|candidatura/ },
 ]
 
-const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+export const normName = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 /** Qual área da pessoa corresponde a uma do catálogo (pelo nome; Finanças é a área fixa). */
 export function presetArea(p: AreaPreset, areas: Area[]) {
-  return areas.find((a) => !a.archived && (p.match.test(norm(a.name)) || (p.key === 'financeiro' && a.is_fixed)))
+  return areas.find((a) => !a.archived && (p.match.test(normName(a.name)) || (p.key === 'financeiro' && a.is_fixed)))
 }
 
 /** Áreas que aparecem no menu e nos painéis: as de foco do ciclo e Finanças. Sem foco marcado, todas. */
