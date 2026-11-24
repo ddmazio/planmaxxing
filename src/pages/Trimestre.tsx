@@ -345,8 +345,9 @@ function AreasPick({ areas, s, set }: { areas: Area[]; s: RT; set: (p: Partial<R
   }
   return (
     <div className="stack">
-      <h1 className="serif-title">Quais áreas você quer olhar neste ritual?</h1>
+      <h1 className="serif-title">Quais áreas da sua vida você quer avaliar?</h1>
       <p className="muted" style={{ margin: 0 }}>Escolha quantas fizerem sentido. Em cada uma você vai dar uma nota e pensar no que funcionou, no que não funcionou e no que melhorar.</p>
+      <div className="card soft caption"><b>Aqui ainda não é o foco.</b> Esta escolha é só para olhar para trás: avaliar o último ciclo e como está cada parte da vida. As áreas de foco do próximo ciclo você escolhe depois, na parte 2, já com essa avaliação na mão.</div>
       <div className="area-pick">
         {mine.map((a) => card(a, { ...a, key: a.id }))}
         {AREA_CATALOG.map((p) => { const a = presetArea(p, areas); return card(a ?? null, a ? { ...p, name: a.name, color: a.color, icon: a.icon } : p) })}
