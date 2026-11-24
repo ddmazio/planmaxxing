@@ -284,7 +284,7 @@ export function Trimestre() {
               if (id === 'inicio' && !s.reflect.length) { set({ reflect: areas.map((a) => a.id), step: 1, sub: 0 }); window.scrollTo({ top: 0 }); return }
               if (id === 'foco') set({ focus: s.focus.filter((k) => s.reflect.includes(k)) })
               next()
-            }}>{id === 'inicio' ? 'Começar' : id === 'reflexao' && s.sub < subList.length - 1 ? `Próxima área: ${subList[s.sub + 1].name}` : id === 'metas' && s.sub < subList.length - 1 ? `Próxima área: ${subList[s.sub + 1].name}` : 'Continuar'}</button>
+            }}>{id === 'inicio' ? 'Começar' : id === 'reflexao' && s.sub < subList.length - 1 ? 'Próxima área' : id === 'metas' && s.sub < subList.length - 1 ? 'Próxima área' : 'Continuar'}</button>
           </div>
         )}
       </section>
