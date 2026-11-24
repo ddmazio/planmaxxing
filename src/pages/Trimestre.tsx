@@ -366,7 +366,7 @@ function PairList({ items, onChange, max, a, b, label }: { items: { t: string; x
           <span className="li-dot" aria-hidden />
           <div className="grow stack" style={{ gap: 2 }}>
             <input className="input bare" defaultValue={it.t} maxLength={200} aria-label={`${label} ${i + 1}`} onBlur={(e) => { const v = e.target.value.trim(); const n = [...items]; if (v) n[i] = { ...it, t: v }; else n.splice(i, 1); onChange(n) }} />
-            <input className="input bare caption muted" defaultValue={it.x} maxLength={300} placeholder={b} aria-label={`${b} ${i + 1}`} onBlur={(e) => { const n = [...items]; n[i] = { ...it, x: e.target.value.trim() }; onChange(n) }} />
+            {it.x && <input className="input bare caption muted" defaultValue={it.x} maxLength={300} aria-label={`${b} ${i + 1}`} onBlur={(e) => { const n = [...items]; n[i] = { ...it, x: e.target.value.trim() }; onChange(n) }} />}
           </div>
           <button className="faint" aria-label="Tirar" onClick={() => onChange(items.filter((_, j) => j !== i))}><Icon name="x" size={14} /></button>
         </div>
