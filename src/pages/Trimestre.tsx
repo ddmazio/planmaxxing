@@ -376,7 +376,6 @@ function PairList({ items, onChange, max, a, b, label }: { items: { t: string; x
           <Icon name="plus" size={16} className="faint" />
           <div className="grow stack" style={{ gap: 2 }}>
             <input className="input bare" value={t} maxLength={200} placeholder={a} onChange={(e) => setT(e.target.value)} aria-label={`Nova linha: ${label}`} />
-            {t.trim() && <input className="input bare caption" value={x} maxLength={300} placeholder={b} onChange={(e) => setX(e.target.value)} onBlur={add} aria-label={b} />}
           </div>
           {t.trim() && <button className="btn secondary small">Adicionar</button>}
         </form>
@@ -406,10 +405,10 @@ function Reflect({ area, r, onChange }: { area: Area; r: AreaRefl; onChange: (r:
           : <button className="caption muted" style={{ alignSelf: 'flex-start' }} onClick={() => set({ score: null })}>Tirar a nota</button>}
       </div>
       <span className="mono muted">O que funcionou, e como · até 4</span>
-      <PairList label="O que funcionou" max={4} a="Ex.: caminhar de manhã" b="Como? Ex.: deixava o tênis na porta"
+      <PairList label="O que funcionou" max={4} a="Ex.: caminhar de manhã, deixando o tênis na porta" b="Como?"
         items={r.good.map((g) => ({ t: g.t, x: g.how }))} onChange={(v) => set({ good: v.map((g) => ({ t: g.t, how: g.x })) })} />
       <span className="mono muted">O que não funcionou, e por quê</span>
-      <PairList label="O que não funcionou" max={12} a="Ex.: estudar à noite" b="Por quê? Ex.: chegava cansada"
+      <PairList label="O que não funcionou" max={12} a="Ex.: estudar à noite, porque chegava cansada" b="Por quê?"
         items={r.bad.map((g) => ({ t: g.t, x: g.why }))} onChange={(v) => set({ bad: v.map((g) => ({ t: g.t, why: g.x })) })} />
       <span className="mono muted">Melhorias para o próximo ciclo</span>
       <ListInput label={`Melhorias em ${area.name}`} items={r.improve} max={10} placeholder="Ex.: estudar de manhã, antes do trabalho" onChange={(v) => set({ improve: v })} />
