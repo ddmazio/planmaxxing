@@ -569,3 +569,34 @@ details.others[open] > summary .caption::after { content: ' ▴'; }
   .sidebar .nav-item { padding-top: 8px; padding-bottom: 8px; }
   .sidebar .nav-section { padding-top: 6px; }
 }
+
+/* ritual: rodapé fixo, troca de etapa com deslize, distribuir e fim */
+.ritual-foot { position: sticky; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 5; margin-top: 8px; padding: 12px 0; background: linear-gradient(to bottom, transparent, var(--bg-canvas) 35%); }
+@media (min-width: 1024px) { .ritual-foot { bottom: 0; padding-bottom: 20px; } }
+.ritual-step.fwd { animation: step-fwd .28s ease both; }
+.ritual-step.back { animation: step-back .28s ease both; }
+@keyframes step-fwd { from { opacity: 0; transform: translateX(24px); } }
+@keyframes step-back { from { opacity: 0; transform: translateX(-24px); } }
+.week-load { flex: 1; max-width: 160px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.week-load > span { display: block; height: 100%; border-radius: 3px; background: var(--lime); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); transition: width .3s ease; }
+.week-load > span.heavy { background: var(--danger); }
+.week-drop { border-radius: 18px; transition: background .15s; }
+.week-drop.over { background: var(--lime-soft); outline: 2px dashed var(--ink); outline-offset: 4px; }
+.week-empty { padding: 12px 16px; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--border); }
+.list-row[draggable='true'] { cursor: grab; }
+.list-row.dragging { opacity: .4; }
+.celebrate { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 18px; position: relative; overflow: hidden; }
+.celebrate-title { font-size: 56px; line-height: 58px; margin: 0; animation: rise .6s ease both .1s; }
+.celebrate-words { justify-content: center; animation: rise .6s ease both .35s; }
+.celebrate-who { font-size: 26px; line-height: 32px; max-width: 640px; margin: 0; color: var(--text-secondary); animation: rise .6s ease both .6s; }
+.celebrate .btn { animation: rise .6s ease both .85s; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+.celebrate-dots { position: absolute; inset: 0; pointer-events: none; }
+.celebrate-dots span { position: absolute; top: -20px; left: calc(var(--i) * 7.2%); width: 10px; height: 10px; border-radius: 50%; background: var(--lime); animation: fall 2.6s ease-in both calc(var(--i) * .09s); }
+.celebrate-dots span:nth-child(3n) { background: var(--on-ink); width: 8px; height: 8px; }
+.celebrate-dots span:nth-child(4n) { background: var(--ink); }
+@keyframes fall { to { transform: translateY(80vh) rotate(180deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ritual-step.fwd, .ritual-step.back, .celebrate-title, .celebrate-words, .celebrate-who, .celebrate .btn { animation: none; }
+  .celebrate-dots { display: none; }
+}

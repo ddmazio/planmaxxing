@@ -95,6 +95,22 @@ export function Trimestre() {
     return () => clearTimeout(t)
   }, [st]) // eslint-disable-line react-hooks/exhaustive-deps
   const [cancelling, setCancelling] = useState(false)
+  // fim do ritual: um momento antes de abrir o Plano do ciclo
+  const [celebrate, setCelebrate] = useState<{ name: string; words: string[]; who: string[] } | null>(null)
+  // direção da troca de etapa (para o deslize ir para o lado certo)
+  const lastPos = useRef(0)
+  const advanceRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return
+      const el = e.target as HTMLElement | null
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName))) return
+      if (document.querySelector('[aria-modal="true"]')) return
+      e.preventDefault(); advanceRef.current()
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [])
   async function saveAndLeave() {
     try { await saveNow(sRef.current); toast('Ritual guardado. Continue de onde parou quando quiser.') } catch { toast('Não deu para guardar agora. Tente de novo.'); return }
     nav('/ciclo')
@@ -182,8 +198,8 @@ export function Trimestre() {
       if (old && old.id !== c.id) await update<Cycle>('cycles', old.id, { status: 'closed' })
       const fin = { ...s, newCycleId: c.id, finished: true }
       if (rowId.current) await update<Reflection>('reflections', rowId.current, { answers: [JSON.stringify(fin)] })
-      toast(`${c.name} começou. Bom ciclo!`)
-      nav('/ciclo')
+      setCelebrate({ name: c.name, words: s.words.slice(0, 3), who: s.who.slice(0, 3) })
+      window.scrollTo({ top: 0 })
     } catch (e) {
       toast(`Não deu para começar o ciclo: ${e instanceof Error ? e.message : 'erro'}`)
     }
@@ -193,12 +209,33 @@ export function Trimestre() {
   const avgScore = (() => { const w = Array.from({ length: execWeeks(old) }, (_, i) => score(oldSteps.filter((x) => x.week === i + 1))).filter((v): v is number => v != null); return w.length ? Math.round(w.reduce((a, b) => a + b, 0) / w.length) : null })()
   const metGoals = oldGoals.filter((g) => { const x = oldSteps.filter((y) => y.goal_id === g.id); return x.length > 0 && x.every((y) => y.done_at) }).length
   const cur = subList[s.sub]
+  const advance = () => {
+    if (id === 'distribuir') return
+    if (id === 'inicio' && !s.reflect.length) { set({ reflect: areas.map((a) => a.id), step: 1, sub: 0 }); window.scrollTo({ top: 0 }); return }
+    if (id === 'foco') set({ focus: s.focus.filter((k) => s.reflect.includes(k)) })
+    next()
+  }
+  advanceRef.current = advance
+  const pos = s.step * 100 + s.sub
+  const dir = pos >= lastPos.current ? 'fwd' : 'back'
+  lastPos.current = pos
   // palavras do ciclo: aceita várias de uma vez, separadas por vírgula; guarda até 3
   const addWords = (text: string) => {
     const next = [...sRef.current.words]
     for (const w of text.split(',').map((x) => x.trim().slice(0, 60)).filter(Boolean)) if (next.length < 3 && !next.some((x) => x.toLowerCase() === w.toLowerCase())) next.push(w)
     if (next.length !== sRef.current.words.length) set({ words: next })
   }
+
+  if (celebrate) return (
+    <div className="page celebrate" role="status">
+      <div className="celebrate-dots" aria-hidden>{Array.from({ length: 14 }, (_, i) => <span key={i} style={{ ['--i' as string]: i }} />)}</div>
+      <span className="mono muted">Ritual concluído</span>
+      <h1 className="serif-title celebrate-title">{celebrate.name} começou.</h1>
+      {celebrate.words.length > 0 && <div className="wordchips celebrate-words">{celebrate.words.map((w) => <span key={w}>{w}</span>)}</div>}
+      {celebrate.who.length > 0 && <p className="serif celebrate-who">“{celebrate.who.map((x) => x.replace(/[.;]+$/, '')).join('. ')}.”</p>}
+      <button className="btn primary" autoFocus onClick={() => nav('/ciclo')}>Ver o meu ciclo</button>
+    </div>
+  )
 
   return (
     <div className="page wide ritual-page solo">
@@ -215,6 +252,7 @@ export function Trimestre() {
           </div>
         </div>
         {part > 0 && <div className="ritual-bar" aria-hidden><span style={{ width: `${Math.round((s.step / (ORDER.length - 1)) * 100)}%` }} /></div>}
+        <div key={`${id}-${s.sub}`} className={'ritual-step stack ' + dir}>
 
         {id === 'inicio' && (
           <div className="stack">
@@ -298,15 +336,12 @@ export function Trimestre() {
         )}
 
         {id === 'distribuir' && <Distribuir s={s} set={set} areas={areas} items={itemsWeek} weeks={nextWeeks} start={nextStart} busy={busy} onFinish={finish} reflected={s.reflect.filter(filled).length} />}
+        </div>
 
         {id !== 'distribuir' && (
-          <div className="row between" style={{ marginTop: 8 }}>
+          <div className="row between ritual-foot">
             {s.step > 0 ? <button className="btn secondary" onClick={back}>Voltar</button> : <span />}
-            <button className="btn primary" onClick={() => {
-              if (id === 'inicio' && !s.reflect.length) { set({ reflect: areas.map((a) => a.id), step: 1, sub: 0 }); window.scrollTo({ top: 0 }); return }
-              if (id === 'foco') set({ focus: s.focus.filter((k) => s.reflect.includes(k)) })
-              next()
-            }}>{id === 'inicio' ? 'Começar' : id === 'reflexao' && s.sub < subList.length - 1 ? 'Próxima área' : id === 'metas' && s.sub < subList.length - 1 ? 'Próxima área' : 'Continuar'}</button>
+            <button className="btn primary" title="Enter" onClick={advance}>{id === 'inicio' ? 'Começar' : id === 'reflexao' && s.sub < subList.length - 1 ? 'Próxima área' : id === 'metas' && s.sub < subList.length - 1 ? 'Próxima área' : 'Continuar'}</button>
           </div>
         )}
       </section>
@@ -644,6 +679,27 @@ function Distribuir({ s, set, areas, items, weeks, start, busy, onFinish, reflec
   const span = (i: Item) => [i.week ?? 1, Math.max(i.week ?? 1, i.weekEnd ?? i.week ?? 1)] as const
   const typeOf = (i: Item) => (i.type === 'projeto' && !i.meta ? 'tarefa' : i.type === 'evento' && !i.date ? 'tarefa' : i.type)
   const metas = s.metas.filter((m) => m.t.trim() && s.focus.includes(m.area))
+  // arrastar um item para outra semana (mantém quantas semanas ele dura)
+  const [drag, setDrag] = useState<string | null>(null)
+  const [over, setOver] = useState<number | null>(null)
+  const moveTo = (id: string, w: number) => { const it = items.find((x) => x.id === id); if (!it) return; const [a, b] = span(it); const nb = Math.min(weeks, w + (b - a)); set({ items: s.items.map((i) => (i.id === id ? { ...i, week: w, weekEnd: nb } : i)) }) }
+  // carga de cada semana: o que começa nela, o que continua e os eventos
+  const load = Array.from({ length: weeks }, (_, k) => dated.filter((i) => (i.type === 'evento' && i.date ? weekOfDate(i.date) === k + 1 : span(i)[0] <= k + 1 && span(i)[1] >= k + 1)).length)
+  const maxLoad = Math.max(1, ...load)
+  const avg = load.reduce((a, b) => a + b, 0) / Math.max(1, weeks)
+  // o que vale olhar antes de começar (não impede de começar)
+  const focusAreas = s.focus.map(area).filter((a): a is Area => !!a)
+  const notes: string[] = []
+  for (const a of focusAreas) {
+    if (!metas.some((m) => m.area === a.id)) notes.push(`${a.name} ainda não tem meta.`)
+    if (!s.rewards.some((r) => r.area === a.id)) notes.push(`${a.name} está sem recompensa.`)
+  }
+  for (const m of metas) if (!live.some((i) => i.meta === m.id)) notes.push(`A meta “${m.t}” ainda não tem projeto, hábito ou tarefa.`)
+  const loose = live.filter((i) => i.type === 'projeto' && !i.meta).length
+  if (loose) notes.push(`${loose} projeto${loose > 1 ? 's' : ''} sem meta ${loose > 1 ? 'vão entrar' : 'vai entrar'} como tarefa.`)
+  load.forEach((n, k) => { if (n >= 5 && n > avg * 1.8) notes.push(`A semana ${k + 1} está pesada (${n} itens). Dá para arrastar alguns para outra.`) })
+  const empty = load.filter((n) => n === 0).length
+  if (live.length && empty > weeks / 2) notes.push(`${empty} das ${weeks} semanas estão vazias.`)
   return (
     <div className="stack">
       <h1 className="serif-title">Revisar e distribuir</h1>
@@ -661,16 +717,32 @@ function Distribuir({ s, set, areas, items, weeks, start, busy, onFinish, reflec
         <span className="mono muted">Hábitos · toda semana</span>
         <div className="card flush list">{habits.map((h) => <div key={h.id} className="list-row"><span className="grow">{h.t}</span><span className="caption muted mono">{(h.days ?? []).map((d) => DAYS[d]).join(' ')}</span><AreaTag area={area(h.area)} /></div>)}</div>
       </>}
+      {notes.length > 0 && (
+        <div className="card soft stack" style={{ gap: 6 }}>
+          <span className="medium">Antes de começar, vale olhar</span>
+          {notes.slice(0, 8).map((n) => <span key={n} className="caption row" style={{ gap: 8, alignItems: 'flex-start' }}><span className="dot" style={{ marginTop: 6 }} />{n}</span>)}
+          <span className="caption muted">Nada disso impede de começar.</span>
+        </div>
+      )}
+      {live.length > 0 && <span className="caption muted desktop-only">Dica: arraste um item para outra semana.</span>}
       {Array.from({ length: weeks }, (_, w) => w + 1).map((w) => {
         const list = dated.filter((i) => (i.type === 'evento' && i.date ? weekOfDate(i.date) : i.week ?? 1) === w)
         const going = dated.filter((i) => !(i.type === 'evento' && i.date) && span(i)[0] < w && span(i)[1] >= w)
-        if (!list.length && !going.length) return null
+        const n = load[w - 1]
         return (
-          <div key={w} className="stack" style={{ gap: 6 }}>
-            <span className="mono muted">Semana {w} · {fmt(addDays(fromYmd(start), (w - 1) * 7), 'd MMM')}</span>
+          <div key={w} className={'stack week-drop' + (over === w ? ' over' : '')} style={{ gap: 6 }}
+            onDragOver={(e) => { if (drag) { e.preventDefault(); setOver(w) } }} onDragLeave={() => setOver((o) => (o === w ? null : o))}
+            onDrop={(e) => { e.preventDefault(); if (drag) moveTo(drag, w); setDrag(null); setOver(null) }}>
+            <div className="row" style={{ gap: 10 }}>
+              <span className="mono muted">Semana {w} · {fmt(addDays(fromYmd(start), (w - 1) * 7), 'd MMM')}</span>
+              <span className="week-load" aria-label={`${n} itens`}><span style={{ width: `${(n / maxLoad) * 100}%` }} className={n >= 5 && n > avg * 1.8 ? 'heavy' : ''} /></span>
+              <span className="caption muted">{n || 'livre'}</span>
+            </div>
+            {list.length + going.length === 0 ? (drag ? <div className="week-empty caption muted">Solte aqui</div> : null) : (
             <div className="card flush list">
               {list.map((i) => (
-                <div key={i.id} className="list-row" style={{ flexWrap: 'wrap', rowGap: 6 }}>
+                <div key={i.id} className={'list-row' + (drag === i.id ? ' dragging' : '')} style={{ flexWrap: 'wrap', rowGap: 6 }}
+                  draggable={!(i.type === 'evento' && i.date)} onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDrag(i.id) }} onDragEnd={() => { setDrag(null); setOver(null) }}>
                   <span className="tag-pill">{TYPE_NAME[typeOf(i)]}</span>
                   <span className="grow" style={{ minWidth: 140 }}>{i.t}</span>
                   <AreaTag area={area(i.area)} />
@@ -693,13 +765,13 @@ function Distribuir({ s, set, areas, items, weeks, start, busy, onFinish, reflec
                   <span className="caption muted">semanas {span(i)[0]} a {span(i)[1]}</span>
                 </div>
               ))}
-            </div>
+            </div>)}
           </div>
         )
       })}
       {!live.length && <Empty>Nenhum projeto, hábito, tarefa ou evento ainda. Volte em “Metas e projetos” para adicionar.</Empty>}
       {s.who.length > 0 && <p className="serif-title" style={{ fontSize: 26 }}>“{s.who.slice(0, 3).map((x) => x.replace(/[.;]+$/, '')).join('. ')}.”</p>}
-      <div className="row between" style={{ marginTop: 8 }}>
+      <div className="row between ritual-foot">
         <button className="btn secondary" onClick={() => { set({ step: ORDER.indexOf('ideias'), sub: 0 }); window.scrollTo({ top: 0 }) }}>Voltar</button>
         <button className="btn primary" disabled={busy || !s.focus.length} onClick={onFinish}>{busy ? 'Organizando…' : 'Começar o ciclo'}</button>
       </div>
