@@ -11,6 +11,8 @@ import { otherAreas } from '../lib/areas'
 import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
+import { useRitualDraft } from '../lib/ritual'
+import { RitualResume } from '../components/RitualResume'
 
 // ---------------------------------------------------------------- dados do ciclo atual
 export function useCycle() {
@@ -42,14 +44,14 @@ export function Ciclo() {
 // ---------------------------------------------------------------- sem ciclo: o novo ciclo começa pelo ritual
 function NovoCiclo() {
   const { cycles } = useCycle()
-  const { rows: refl } = useRows<Reflection>('reflections', { eq: { kind: 'reset' } })
-  const going = refl.filter((r) => r.prompt === 'ritual-trimestre').map((r) => { try { return JSON.parse(r.answers[0] ?? '{}') as { v?: number; finished?: boolean; step?: number } } catch { return {} } }).find((j) => j.v === 2 && !j.finished)
+  const going = useRitualDraft()
   const last = cycles.find((c) => c.status === 'closed')
   return (
     <div className="page" style={{ maxWidth: 720 }}>
       <PageHeader eyebrow={last ? `Último ciclo: ${last.name}` : 'Sem ciclo em curso'} title="Novo ciclo" />
       <div className="card stack" style={{ gap: 12 }}>
-        <span className="serif" style={{ fontSize: 26, lineHeight: '30px' }}>{going ? 'Seu ritual de novo ciclo está pela metade.' : 'Um ciclo novo começa pelo ritual.'}</span>
+        <span className="serif" style={{ fontSize: 26, lineHeight: '30px' }}>{going ? 'Seu ritual de novo ciclo está guardado.' : 'Um ciclo novo começa pelo ritual.'}</span>
+        {going && <span className="tag-pill lime" style={{ alignSelf: 'flex-start' }}>{going.part ? `parte ${going.part} de 3 · ` : ''}parou em {going.name}</span>}
         <p className="muted" style={{ margin: 0 }}>Você olha cada área, escolhe as de foco e o que quer TER no fim, define recompensas, 3 palavras, metas e projetos. No fim o app distribui tudo pelas semanas.</p>
         <div className="card flush list">
           {[['Olhar para trás', 'Escolher áreas e refletir cada uma'], ['Decidir', 'Foco, quero TER, recompensas, 3 palavras, metas e projetos'], ['Organizar', 'Datas do ciclo, ideias e distribuir pelas semanas']].map(([t, h], i) => (
@@ -105,6 +107,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
           : now === TOTAL_WEEKS ? 'semana de revisão'
           : `semana ${now} de ${EXEC_WEEKS}`}`} title="Plano do ciclo"
         right={<div className="row" style={{ gap: 8 }}><Link className="btn secondary small" to="/grupo"><Icon name="users" size={16} />Grupo</Link><Link className="btn primary small" to="/ciclo/ritual"><Icon name="sparkle" size={16} />Ritual da semana</Link></div>} />
+      <RitualResume />
 
       <div className="plan-stats">
         <div><span className="big">{goals.length}</span><span className="caption muted">meta{goals.length === 1 ? '' : 's'}</span></div>

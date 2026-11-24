@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useOutletContext } from 'react-router-dom'
-import { insert, update } from '../lib/db'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { insert, remove, update } from '../lib/db'
+import { RITUAL_NAMES, RITUAL_ORDER, RITUAL_P1, RITUAL_P2, RITUAL_P3 } from '../lib/ritual'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, weekStart, ymd } from '../lib/dates'
 import { currentCycle, execWeeks, newCycleDates, score, totalWeeks, weekOf } from '../lib/cycle'
@@ -9,7 +10,7 @@ import { DurationPicker } from '../components/DurationPicker'
 import { useApp } from '../lib/app'
 import { useAuth } from '../lib/auth'
 import type { Area, CalEvent, Cycle, Goal, Habit, Reflection, Step, Task } from '../lib/types'
-import { AreaIcon, AreaTag, Empty } from '../components/ui'
+import { AreaIcon, AreaTag, Empty, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { ListInput, RailSteps } from '../components/ListInput'
 import { type ShellCtx } from '../components/Shell'
@@ -36,14 +37,7 @@ const empty = (): RT => ({ v: 2, step: 0, sub: 0, reflect: [], created: [], refl
 const blankRefl = (): AreaRefl => ({ score: null, good: [], bad: [], improve: [] })
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-const P1 = ['areas', 'reflexao']
-const P2 = ['foco', 'tipos', 'recompensas', 'palavras', 'metas']
-const P3 = ['datas', 'ideias', 'distribuir']
-const ORDER = ['inicio', ...P1, ...P2, ...P3]
-const NAMES: Record<string, string> = {
-  areas: 'Escolher áreas', reflexao: 'Refletir', foco: 'Foco', tipos: 'Hábito, projeto, mix', recompensas: 'Recompensas', palavras: '3 palavras', metas: 'Metas e projetos',
-  datas: 'Datas do ciclo', ideias: 'Ideias', distribuir: 'Revisar e distribuir',
-}
+const P1 = RITUAL_P1, P2 = RITUAL_P2, P3 = RITUAL_P3, ORDER = RITUAL_ORDER, NAMES = RITUAL_NAMES
 export const KIND_NAME: Record<Kind, string> = { habit: 'Hábito', project: 'Projeto', both: 'Mix' }
 const TYPE_NAME: Record<ItemType, string> = { projeto: 'Projeto', habito: 'Hábito', tarefa: 'Tarefa', evento: 'Evento' }
 const DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
@@ -79,15 +73,35 @@ export function Trimestre() {
   const oldSteps = steps.filter((x) => oldGoals.some((g) => g.id === x.goal_id))
 
   // guarda sozinho, um pouco depois de cada mudança (dá para pausar e voltar)
+  const discarded = useRef(false)
+  async function saveNow(state: RT) {
+    if (discarded.current) return
+    const body = { answers: [JSON.stringify(state)], title: 'Ritual do ciclo' }
+    if (rowId.current) await update<Reflection>('reflections', rowId.current, body)
+    else { const r = await insert<Reflection>('reflections', { cycle_id: old?.id ?? null, kind: 'reset', week: null, prompt: 'ritual-trimestre', score: null, ...body }); rowId.current = r.id }
+  }
   useEffect(() => {
     if (!st) return
-    const t = setTimeout(async () => {
-      const body = { answers: [JSON.stringify(st)], title: 'Ritual do ciclo' }
-      if (rowId.current) await update<Reflection>('reflections', rowId.current, body)
-      else { const r = await insert<Reflection>('reflections', { cycle_id: old?.id ?? null, kind: 'reset', week: null, prompt: 'ritual-trimestre', score: null, ...body }); rowId.current = r.id }
-    }, 500)
+    const t = setTimeout(() => { saveNow(st) }, 500)
     return () => clearTimeout(t)
   }, [st]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [cancelling, setCancelling] = useState(false)
+  async function saveAndLeave() {
+    try { await saveNow(sRef.current); toast('Ritual guardado. Continue de onde parou quando quiser.') } catch { toast('Não deu para guardar agora. Tente de novo.'); return }
+    nav('/ciclo')
+  }
+  async function discard() {
+    discarded.current = true
+    const cur = sRef.current
+    try {
+      if (rowId.current) await remove('reflections', rowId.current)
+      for (const k of cur.created) await update<Area>('areas', k, { archived: true, focus: false })
+      const planning = cycles.find((c) => c.id === cur.newCycleId && c.status === 'planning')
+      if (planning) await remove('cycles', planning.id)
+      toast('Criação do ciclo cancelada.')
+      nav('/ciclo')
+    } catch { discarded.current = false; toast('Não deu para cancelar agora. Tente de novo.') }
+  }
 
   if (loading) return <div className="page"><p className="muted">Carregando…</p></div>
   const id = ORDER[s.step]
@@ -184,7 +198,10 @@ export function Trimestre() {
       <section className="stack ritual-main">
         <div className="row between">
           <span className="mono muted">{part ? `Parte ${part} de 3 · ${NAMES[id]}` : 'Início'}</span>
-          <Link className="btn ghost small" to="/ciclo"><Icon name="x" size={14} />Pausar</Link>
+          <div className="row" style={{ gap: 4 }}>
+            <button className="btn ghost small" onClick={saveAndLeave}><Icon name="download" size={14} />Guardar e sair</button>
+            <button className="btn ghost small" onClick={() => setCancelling(true)}><Icon name="x" size={14} />Cancelar ciclo</button>
+          </div>
         </div>
 
         {id === 'inicio' && (
@@ -278,6 +295,15 @@ export function Trimestre() {
           </div>
         )}
       </section>
+
+      <Sheet open={cancelling} onClose={() => setCancelling(false)} title="Cancelar a criação do ciclo?" labelledBy="cancel-ritual">
+        <div className="stack" style={{ gap: 12 }}>
+          <p style={{ margin: 0 }}>Tudo o que você escreveu neste ritual é apagado: reflexões das áreas, foco, recompensas, palavras, metas, projetos e ideias. Não dá para desfazer.</p>
+          <p className="caption muted" style={{ margin: 0 }}>{old ? `O ciclo ${old.name} continua como está. ` : ''}Áreas que você criou aqui saem do menu. Datas que você adicionou à agenda ficam na Agenda.</p>
+          <button className="btn primary block" onClick={() => { setCancelling(false); saveAndLeave() }}>Guardar para continuar depois</button>
+          <button className="btn block" style={{ color: 'var(--danger)', boxShadow: 'inset 0 0 0 1px var(--danger)' }} onClick={discard}>Apagar e cancelar</button>
+        </div>
+      </Sheet>
     </div>
   )
 }

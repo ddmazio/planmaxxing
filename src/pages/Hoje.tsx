@@ -18,6 +18,7 @@ import { useCycle } from './Ciclo'
 import { useCalendars } from '../lib/calendars'
 import { useFeature } from '../lib/app'
 import { shownAreas } from '../lib/areas'
+import { RitualResume } from '../components/RitualResume'
 
 const toggleStep = async (s: Step) => {
   await update<Step>('steps', s.id, { done_at: s.done_at ? null : new Date().toISOString() })
@@ -121,6 +122,7 @@ export function Hoje() {
           <h1 className="h1">{greeting(now)}{first ? `, ${first}` : ''}</h1>
         </div>
       </header>
+      <RitualResume />
 
       <div className="hoje-hero">
         {/* 4.1 · Agora / Livre */}

@@ -529,3 +529,4 @@ details.others > summary { cursor: pointer; list-style: none; }
 details.others > summary::-webkit-details-marker { display: none; }
 details.others[open] > summary .caption::after { content: ' ▴'; }
 .prize { background: var(--lime); color: var(--on-lime); }
+.ritual-resume { background: var(--lime-soft); box-shadow: none; }
