@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // versão nova: o app mostra “Atualizar” (componente UpdatePrompt) em vez de esperar fechar e abrir
+      // versão nova: o app mostra “Atualizar” (componente UpdatePrompt); o recarregamento fica com a pessoa
       registerType: 'prompt',
       injectRegister: false,
       includeAssets: ['icons/*.png', 'icons/tf-icon.svg', 'favicon.ico'],
@@ -37,6 +37,8 @@ export default defineConfig({
         importScripts: ['push-sw.js'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
+        // a versão nova assume sozinha em segundo plano; o app só mostra "Atualizar", que recarrega a página
+        skipWaiting: true,
       },
     }),
   ],
