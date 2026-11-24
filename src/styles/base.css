@@ -600,3 +600,4 @@ details.others[open] > summary .caption::after { content: ' ▴'; }
   .ritual-step.fwd, .ritual-step.back, .celebrate-title, .celebrate-words, .celebrate-who, .celebrate .btn { animation: none; }
   .celebrate-dots { display: none; }
 }
+.spin { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; vertical-align: -2px; } @keyframes spin { to { transform: rotate(360deg); } }
