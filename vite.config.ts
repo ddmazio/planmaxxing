@@ -7,8 +7,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'script-defer',
+      // versão nova: o app mostra “Atualizar” (componente UpdatePrompt) em vez de esperar fechar e abrir
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['icons/*.png', 'icons/tf-icon.svg', 'favicon.ico'],
       manifest: {
         name: 'Twelvefold',
@@ -35,8 +36,6 @@ export default defineConfig({
         // avisos (push) e o clique neles
         importScripts: ['push-sw.js'],
         cleanupOutdatedCaches: true,
-        // versão nova assume na hora (sem esperar fechar todas as janelas do app)
-        skipWaiting: true,
         clientsClaim: true,
       },
     }),

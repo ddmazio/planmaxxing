@@ -76,15 +76,22 @@ export function Trimestre() {
 
   // guarda sozinho, um pouco depois de cada mudança (dá para pausar e voltar)
   const discarded = useRef(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   async function saveNow(state: RT) {
     if (discarded.current) return
     const body = { answers: [JSON.stringify(state)], title: 'Ritual do ciclo' }
-    if (rowId.current) await update<Reflection>('reflections', rowId.current, body)
-    else { const r = await insert<Reflection>('reflections', { cycle_id: old?.id ?? null, kind: 'reset', week: null, prompt: 'ritual-trimestre', score: null, ...body }); rowId.current = r.id }
+    setSaveState('saving')
+    try {
+      if (rowId.current) await update<Reflection>('reflections', rowId.current, body)
+      else { const r = await insert<Reflection>('reflections', { cycle_id: old?.id ?? null, kind: 'reset', week: null, prompt: 'ritual-trimestre', score: null, ...body }); rowId.current = r.id }
+      setSaveState('saved')
+    } catch (e) { setSaveState('error'); throw e }
   }
+  // antes de o app recarregar para uma versão nova, guarda o que estiver pendente
+  useEffect(() => { const on = () => { if (st) saveNow(sRef.current).catch(() => {}) }; window.addEventListener('tf-flush', on); return () => window.removeEventListener('tf-flush', on) }) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!st) return
-    const t = setTimeout(() => { saveNow(st) }, 500)
+    const t = setTimeout(() => { saveNow(st).catch(() => {}) }, 500)
     return () => clearTimeout(t)
   }, [st]) // eslint-disable-line react-hooks/exhaustive-deps
   const [cancelling, setCancelling] = useState(false)
@@ -200,6 +207,9 @@ export function Trimestre() {
         <div className="row between">
           <span className="mono muted">{part ? `Parte ${part} de 3 · ${NAMES[id]}${cur ? ` · ${cur.name}, ${s.sub + 1} de ${subList.length}` : ''}` : 'Início'}</span>
           <div className="row" style={{ gap: 4 }}>
+            <span className={'save-state caption ' + saveState} role="status" aria-live="polite">
+              {saveState === 'saving' ? 'Guardando…' : saveState === 'saved' ? <><Icon name="check" size={13} />Guardado</> : saveState === 'error' ? 'Não guardou. Sem internet?' : ''}
+            </span>
             <button className="btn ghost small" onClick={saveAndLeave}><Icon name="download" size={14} />Guardar e sair</button>
             <button className="btn ghost small" onClick={() => setCancelling(true)}><Icon name="x" size={14} />Cancelar ciclo</button>
           </div>

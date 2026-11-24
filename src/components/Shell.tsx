@@ -1,4 +1,5 @@
 import { Logo } from './Logo'
+import { updateNow } from './UpdatePrompt'
 import { useApp } from '../lib/app'
 import { useIsAdmin } from '../pages/Admin'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -131,7 +132,7 @@ export function Shell() {
           {!inRitual && <button className="btn primary new-btn desktop-only" onClick={() => openNew()}><Icon name="plus" size={16} />Novo</button>}
         </div>
         {notice && <div className="notice-bar" role="status"><Icon name="bell" size={14} /><span className="grow">{notice}</span><button className="notice-x" onClick={hideNotice} aria-label="Fechar aviso"><Icon name="x" size={14} /></button></div>}
-        {stale && <div className="notice-bar" role="status"><Icon name="repeat" size={14} /><span className="grow">Tem uma versão nova do app.</span><button className="btn small" onClick={() => window.location.reload()}>Atualizar</button></div>}
+        {stale && <div className="notice-bar" role="status"><Icon name="repeat" size={14} /><span className="grow">Tem uma versão nova do app.</span><button className="btn small" onClick={() => updateNow()}>Atualizar</button></div>}
         {app.maintenance && owner && <div className="notice-bar" role="status"><Icon name="lock" size={14} /><span className="grow">Modo manutenção ligado: as outras pessoas veem uma tela de pausa.</span></div>}
         {offline && <div className="offline-bar" role="status"><Icon name="repeat" size={14} />Sem conexão. O que já está na tela continua aqui; mudanças feitas agora podem não ser guardadas até a internet voltar.</div>}
         {demo && <div className="banner" style={{ maxWidth: 1224, margin: '0 auto 12px' }}>Modo demonstração: os dados ficam só neste aparelho. Ligue o Supabase para sincronizar e partilhar.</div>}

@@ -28,6 +28,7 @@ import { AreaPage, Ciclo } from './pages/Ciclo'
 import { Ritual } from './pages/Semana'
 import { Trimestre } from './pages/Trimestre'
 import { DEMO } from './lib/db'
+import { UpdatePrompt } from './components/UpdatePrompt'
 
 applyTheme(savedTheme())
 
@@ -92,6 +93,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider><Gate /></AuthProvider>
+      {!DEMO && <UpdatePrompt />}
     </BrowserRouter>
   </StrictMode>,
 )
