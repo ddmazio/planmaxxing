@@ -1,16 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { insert, remove, removeWhere, update } from '../lib/db'
-import { useAuth } from '../lib/auth'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/dates'
-import { execWeeks, totalWeeks, currentCycle, daysUntil, newCycleDates, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
+import { execWeeks, totalWeeks, currentCycle, daysUntil, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
 import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, Step, Task } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
 import { GoalWizard } from '../components/GoalWizard'
-import { DurationPicker } from '../components/DurationPicker'
 import { otherAreas } from '../lib/areas'
-import { useApp } from '../lib/app'
 import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
@@ -42,100 +39,26 @@ export function Ciclo() {
   return data.cycle ? <CicloAtivo data={data} cycle={data.cycle} /> : <NovoCiclo />
 }
 
-// ---------------------------------------------------------------- criar ciclo (3 passos)
+// ---------------------------------------------------------------- sem ciclo: o novo ciclo começa pelo ritual
 function NovoCiclo() {
-  const { profile } = useAuth()
-  const { cycles, areas } = useCycle()
-  const { toast } = useOutletContext<ShellCtx>()
-  const [step, setStep] = useState(0)
-  const [name, setName] = useState(`Ciclo ${cycles.length + 1}`)
-  const [start, setStart] = useState(ymd(weekStart(new Date(), profile?.week_starts_on ?? 1)))
-  const { settings: appSettings } = useApp()
-  const [weeksPick, setWeeks] = useState<number | null>(null)
-  const weeks = weeksPick ?? appSettings.default_weeks
-  const [words, setWords] = useState('')
-  const [who, setWho] = useState('')
-  const [goals, setGoals] = useState<{ area_id: string | null; title: string; done_definition: string }[]>([])
-  const [draft, setDraft] = useState({ area_id: '', title: '', done_definition: '' })
-  const [busy, setBusy] = useState(false)
-  const focus = areas.filter((a) => a.focus && !a.is_fixed)
-  const dates = newCycleDates(start, weeks)
-
-  async function create() {
-    setBusy(true)
-    try {
-      const c = await insert<Cycle>('cycles', { name: name.trim(), ...dates, status: 'active', words: splitList(words).slice(0, 10), who_is_she: splitLines(who).slice(0, 20) })
-      for (const [i, g] of goals.entries()) await insert<Goal>('goals', { cycle_id: c.id, area_id: g.area_id, title: g.title, done_definition: g.done_definition || null, kind: 'project', position: i })
-      toast('Ciclo criado. Agora quebre cada meta em passos.')
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Não deu para criar o ciclo')
-      setBusy(false)
-    }
-  }
-
-  const steps = ['Quando', 'Quem você quer ser', 'Metas']
+  const { cycles } = useCycle()
+  const { rows: refl } = useRows<Reflection>('reflections', { eq: { kind: 'reset' } })
+  const going = refl.filter((r) => r.prompt === 'ritual-trimestre').map((r) => { try { return JSON.parse(r.answers[0] ?? '{}') as { v?: number; finished?: boolean; step?: number } } catch { return {} } }).find((j) => j.v === 2 && !j.finished)
+  const last = cycles.find((c) => c.status === 'closed')
   return (
-    <div className="page">
-      <PageHeader eyebrow={`Novo ciclo · ${step + 1} de 3`} title={steps[step]} />
-      <div className="row" style={{ gap: 4 }}>{steps.map((_, i) => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? 'var(--ink)' : 'var(--border)' }} />)}</div>
-
-      {step === 0 && (
-        <div className="stack">
-          <div className="card soft caption">Um ciclo tem algumas semanas para fazer acontecer e 1 semana para olhar para trás. Sem prazo distante, cada semana conta.</div>
-          <label className="field"><span>Nome do ciclo</span><input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} /></label>
-          <label className="field"><span>Começa em</span><input type="date" className="input" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
-          <DurationPicker weeks={weeks} start={start} onChange={setWeeks} />
-          <p className="caption muted" style={{ margin: 0 }}>Termina em {fmt(fromYmd(dates.ends_on), "d 'de' MMMM 'de' yyyy")}, com a semana {weeks + 1} para revisão.</p>
-          <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={!name.trim()} onClick={() => setStep(1)}>Continuar</button>
+    <div className="page" style={{ maxWidth: 720 }}>
+      <PageHeader eyebrow={last ? `Último ciclo: ${last.name}` : 'Sem ciclo em curso'} title="Novo ciclo" />
+      <div className="card stack" style={{ gap: 12 }}>
+        <span className="serif" style={{ fontSize: 26, lineHeight: '30px' }}>{going ? 'Seu ritual de novo ciclo está pela metade.' : 'Um ciclo novo começa pelo ritual.'}</span>
+        <p className="muted" style={{ margin: 0 }}>Você olha cada área, escolhe as de foco e o que quer TER no fim, define recompensas, 3 palavras, metas e projetos. No fim o app distribui tudo pelas semanas.</p>
+        <div className="card flush list">
+          {[['Olhar para trás', 'Escolher áreas e refletir cada uma'], ['Decidir', 'Foco, quero TER, recompensas, 3 palavras, metas e projetos'], ['Organizar', 'Datas do ciclo, ideias e distribuir pelas semanas']].map(([t, h], i) => (
+            <div key={t} className="list-row"><span className="ritual-num">{i + 1}</span><div className="stack" style={{ gap: 0 }}><span className="medium">{t}</span><span className="caption muted">{h}</span></div></div>
+          ))}
         </div>
-      )}
-
-      {step === 1 && (
-        <div className="stack">
-          <label className="field"><span>Palavras do ciclo (separe por vírgula)</span>
-            <input className="input" placeholder="calma, foco, coragem" value={words} maxLength={300} onChange={(e) => setWords(e.target.value)} /></label>
-          <label className="field"><span>Quem é a pessoa que termina este ciclo? Uma frase por linha</span>
-            <textarea className="input" rows={5} placeholder={'Acorda cedo sem esforço\nTermina o que começa'} value={who} maxLength={2000} onChange={(e) => setWho(e.target.value)} /></label>
-          <div className="row between">
-            <button className="btn ghost" onClick={() => setStep(0)}>← Voltar</button>
-            <button className="btn primary" onClick={() => setStep(2)}>{words || who ? 'Continuar' : 'Pular por agora'}</button>
-          </div>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="stack">
-          <p className="muted" style={{ margin: 0 }}>Poucas metas, bem escolhidas. O ideal são 1 a 3, ligadas às áreas em foco.</p>
-          {goals.length > 0 && (
-            <div className="card flush list">
-              {goals.map((g, i) => (
-                <div key={i} className="list-row">
-                  <div className="grow stack" style={{ gap: 2 }}>
-                    <span className="medium">{g.title}</span>
-                    {g.done_definition && <span className="caption muted">Pronto quando: {g.done_definition}</span>}
-                  </div>
-                  <AreaTag area={areas.find((a) => a.id === g.area_id)} />
-                  <button aria-label="Tirar meta" className="faint" onClick={() => setGoals(goals.filter((_, j) => j !== i))}><Icon name="x" size={16} /></button>
-                </div>
-              ))}
-            </div>
-          )}
-          <form className="card stack" onSubmit={(e) => { e.preventDefault(); if (!draft.title.trim()) return; setGoals([...goals, { area_id: draft.area_id || null, title: draft.title.trim(), done_definition: draft.done_definition.trim() }]); setDraft({ area_id: draft.area_id, title: '', done_definition: '' }) }}>
-            <label className="field"><span>Meta</span><input className="input" placeholder="Ex.: Lançar o portfólio novo" value={draft.title} maxLength={200} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
-            <label className="field"><span>Está pronta quando…</span><input className="input" placeholder="Ex.: site no ar com 3 projetos" value={draft.done_definition} maxLength={500} onChange={(e) => setDraft({ ...draft, done_definition: e.target.value })} /></label>
-            <label className="field"><span>Área</span>
-              <select className="input" value={draft.area_id} onChange={(e) => setDraft({ ...draft, area_id: e.target.value })}>
-                <option value="">Sem área</option>
-                {(focus.length ? focus : areas).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select></label>
-            <button className="btn secondary" disabled={!draft.title.trim()}><Icon name="plus" size={16} />Adicionar meta</button>
-          </form>
-          <div className="row between">
-            <button className="btn ghost" onClick={() => setStep(1)}>← Voltar</button>
-            <button className="btn primary" disabled={busy || (!goals.length && !!draft.title.trim())} onClick={create}>{goals.length ? 'Criar ciclo' : 'Criar sem metas'}</button>
-          </div>
-        </div>
-      )}
+        <Link className="btn primary" style={{ alignSelf: 'flex-start' }} to="/ciclo/trimestre"><Icon name="sparkle" size={16} />{going ? 'Continuar o ritual' : 'Começar o ritual'}</Link>
+        <span className="caption muted">Dá para pausar a qualquer momento. O app guarda onde você parou.</span>
+      </div>
     </div>
   )
 }
