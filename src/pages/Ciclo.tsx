@@ -53,11 +53,6 @@ function NovoCiclo() {
         <span className="serif" style={{ fontSize: 26, lineHeight: '30px' }}>{going ? 'Seu ritual de novo ciclo está guardado.' : 'Um ciclo novo começa pelo ritual.'}</span>
         {going && <span className="tag-pill lime" style={{ alignSelf: 'flex-start' }}>{going.part ? `parte ${going.part} de 3 · ` : ''}parou em {going.name}</span>}
         <p className="muted" style={{ margin: 0 }}>Você olha cada área, escolhe as de foco e o que quer TER no fim, define recompensas, 3 palavras, metas e projetos. No fim o app distribui tudo pelas semanas.</p>
-        <div className="card flush list">
-          {[['Olhar para trás', 'Escolher áreas e refletir cada uma'], ['Decidir', 'Foco, quero TER, recompensas, 3 palavras, metas e projetos'], ['Organizar', 'Datas do ciclo, ideias e distribuir pelas semanas']].map(([t, h], i) => (
-            <div key={t} className="list-row"><span className="ritual-num">{i + 1}</span><div className="stack" style={{ gap: 0 }}><span className="medium">{t}</span><span className="caption muted">{h}</span></div></div>
-          ))}
-        </div>
         <Link className="btn primary" style={{ alignSelf: 'flex-start' }} to="/ciclo/trimestre"><Icon name="sparkle" size={16} />{going ? 'Continuar o ritual' : 'Começar o ritual'}</Link>
         <span className="caption muted">Dá para pausar a qualquer momento. O app guarda onde você parou.</span>
       </div>

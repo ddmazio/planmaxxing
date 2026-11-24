@@ -530,3 +530,4 @@ details.others > summary::-webkit-details-marker { display: none; }
 details.others[open] > summary .caption::after { content: ' ▴'; }
 .prize { background: var(--lime); color: var(--on-lime); }
 .ritual-resume { background: var(--lime-soft); box-shadow: none; }
+@media (min-width: 1024px) { .ritual-page.solo { grid-template-columns: minmax(0, 1fr); } .ritual-page.solo .ritual-main { margin: 0 auto; width: 100%; } }

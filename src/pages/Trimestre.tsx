@@ -184,8 +184,8 @@ export function Trimestre() {
   const cur = subList[s.sub]
 
   return (
-    <div className="page wide ritual-page">
-      <aside className="ritual-rail">
+    <div className={'page wide ritual-page' + (id === 'inicio' ? ' solo' : '')}>
+      {id !== 'inicio' && <aside className="ritual-rail">
         <span className="mono muted">Ritual do ciclo</span>
         <RailSteps title="1 · Olhar para trás" items={P1.map((k) => NAMES[k])} active={part === 1 ? P1.indexOf(id) : -1} done={s.step > ORDER.indexOf('reflexao')} onPick={(i) => go(ORDER.indexOf(P1[i]))} />
         {id === 'reflexao' && cur && <span className="caption muted" style={{ marginTop: -10, paddingLeft: 10 }}>{cur.name} · {s.sub + 1} de {subList.length}</span>}
@@ -193,7 +193,7 @@ export function Trimestre() {
         {id === 'metas' && cur && <span className="caption muted" style={{ marginTop: -10, paddingLeft: 10 }}>{cur.name} · {s.sub + 1} de {subList.length}</span>}
         <RailSteps title="3 · Organizar" items={P3.map((k) => NAMES[k])} active={part === 3 ? P3.indexOf(id) : -1} done={false} onPick={(i) => go(ORDER.indexOf(P3[i]))} />
         <span className="caption faint">Dá para pausar a qualquer momento. O app guarda onde você parou.</span>
-      </aside>
+      </aside>}
 
       <section className="stack ritual-main">
         <div className="row between">
