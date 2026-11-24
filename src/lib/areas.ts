@@ -7,7 +7,7 @@ export const AREA_CATALOG: AreaPreset[] = [
   { key: 'estudos', name: 'Estudos', color: 'estudos', icon: 'book', match: /^estud|faculdade|cursos?$/ },
   { key: 'familia', name: 'Família', color: 'relacoes', icon: 'home', match: /^familia/ },
   { key: 'relacoes', name: 'Relações', color: 'relacoes', icon: 'users', hint: 'amizades, relacionamento e pessoas próximas', match: /^relac|^amizade|^amig|^namoro/ },
-  { key: 'self', name: 'Self improvement', color: 'eu', icon: 'growth', match: /self|autodesenvolv|crescimento/ },
+  { key: 'self', name: 'Eu', color: 'eu', icon: 'sparkle', hint: 'self improvement e autocuidado', match: /^eu$|self|autodesenvolv|crescimento|autocuidado/ },
   { key: 'saude', name: 'Saúde', color: 'saude', icon: 'heart', hint: 'corpo, sono, alimentação, exercício', match: /^saude( fisica)?$|^corpo|^treino/ },
   { key: 'mental', name: 'Saúde mental', color: 'saude', icon: 'leaf', match: /saude mental|^mente/ },
   { key: 'financeiro', name: 'Financeiro', color: 'financas', icon: 'wallet', match: /^financ/ },
