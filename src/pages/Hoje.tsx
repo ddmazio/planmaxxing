@@ -17,6 +17,7 @@ import type { ShellCtx } from '../components/Shell'
 import { useCycle } from './Ciclo'
 import { useCalendars } from '../lib/calendars'
 import { useFeature } from '../lib/app'
+import { shownAreas } from '../lib/areas'
 
 const toggleStep = async (s: Step) => {
   await update<Step>('steps', s.id, { done_at: s.done_at ? null : new Date().toISOString() })
@@ -83,7 +84,7 @@ export function Hoje() {
   const logsToday = logs.filter((l) => l.day === today)
   const weekSteps = inExec ? steps.filter((s) => s.week === week) : []
   const doneSteps = weekSteps.filter((s) => s.done_at).length
-  const exec = areaExecution({ areas: areas.filter((a) => !a.is_fixed), goals, steps, habits, logs, week, days, today })
+  const exec = areaExecution({ areas: shownAreas(areas).filter((a) => !a.is_fixed), goals, steps, habits, logs, week, days, today })
   const goalOf = (id: string) => goals.find((g) => g.id === id)
   const first = profile?.display_name?.split(' ')[0]
   const q = cycle ? quote(cycle.who_is_she) : null
@@ -282,7 +283,7 @@ export function Hoje() {
 
           <SectionHead title="Áreas da vida" action={<span className="mono muted">Execução</span>} />
           <div className="card flush list">
-            {areas.filter((a) => !a.is_fixed).map((a) => {
+            {shownAreas(areas).filter((a) => !a.is_fixed).map((a) => {
               const v = exec.get(a.id) ?? null
               return (
                 <Link key={a.id} to={`/ciclo/area/${a.id}`} className="list-row area-exec">

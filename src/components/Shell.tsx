@@ -13,6 +13,7 @@ import { Icon } from './Icon'
 import { QuickAdd } from './QuickAdd'
 import { GOTO, Search } from './Search'
 import { AreaIcon, Toast } from './ui'
+import { shownAreas } from '../lib/areas'
 
 /** menu de baixo no celular: o + fica no meio; Hoje mora no botão Início do topo */
 const MAIN_LEFT: [string, string, string][] = [['/agenda', 'Agenda', 'calendar'], ['/tarefas', 'Tarefas', 'check']]
@@ -102,7 +103,7 @@ export function Shell() {
           <NavLink key={to} to={to} title={label} className={() => 'nav-item' + (isActive(to) ? ' active' : '')}><Icon name={icon} /><span className="nav-label">{label}</span></NavLink>
         ))}
         <div className="nav-section mono faint">Áreas da vida</div>
-        {areas.map((a) => (
+        {shownAreas(areas).map((a) => (
           <NavLink key={a.id} to={a.is_fixed ? '/financas' : `/ciclo/area/${a.id}`} title={a.name} className={() => 'nav-item' + (loc.pathname === `/ciclo/area/${a.id}` ? ' active' : '')} style={{ paddingTop: 6, paddingBottom: 6 }}>
             <AreaIcon area={a} size={26} /><span className="nav-label">{a.name}</span>
           </NavLink>

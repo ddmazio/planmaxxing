@@ -81,6 +81,8 @@ export interface Query {
 export interface Cycle extends Owned {
   name: string; starts_on: string; ends_on: string; status: 'planning' | 'active' | 'closed'
   words: string[]; who_is_she: string[]
+  /** recompensas por área de foco e a lista de ideias (prêmios), definidas no ritual */
+  rewards?: { t: string; area: string }[]; ideas?: string[]
 }
 export interface Goal extends Owned {
   cycle_id: string; area_id: string | null; title: string; done_definition: string | null

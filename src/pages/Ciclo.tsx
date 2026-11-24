@@ -9,6 +9,7 @@ import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, St
 import { TaskRow } from '../components/TaskRow'
 import { GoalWizard } from '../components/GoalWizard'
 import { DurationPicker } from '../components/DurationPicker'
+import { otherAreas } from '../lib/areas'
 import { useApp } from '../lib/app'
 import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -157,6 +158,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
   const ended = now > TOTAL_WEEKS
   const goalOf = (id: string) => goals.find((g) => g.id === id)
   const areaOf = (id: string | null) => areas.find((a) => a.id === id)
+  const others = otherAreas(areas)
   const reviewedNow = reflections.some((r) => r.kind === 'review' && r.week === now)
 
   const [deleting, setDeleting] = useState(false)
@@ -262,6 +264,25 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
             </div>
           ) : <Empty>Escreva as palavras do ciclo e quem você quer ser no fim dele.</Empty>}
 
+          {(cycle.rewards?.length ?? 0) > 0 && <>
+            <SectionHead title="Recompensas" />
+            <div className="card flush list">
+              {cycle.rewards!.map((r, i) => <div key={i} className="list-row"><Icon name="gift" size={16} className="faint" /><span className="grow">{r.t}</span><AreaTag area={areaOf(r.area)} /></div>)}
+            </div>
+          </>}
+          {(cycle.ideas?.length ?? 0) > 0 && <>
+            <SectionHead title="Ideias para o ciclo" action={<span className="caption muted">prêmios para as semanas boas</span>} />
+            <div className="card soft wordchips">{cycle.ideas!.map((x) => <span key={x}>{x}</span>)}</div>
+          </>}
+          {others.length > 0 && (
+            <details className="card others">
+              <summary className="row between"><span className="medium">Outras áreas · {others.length}</span><span className="caption muted">sem metas neste ciclo</span></summary>
+              <div className="list" style={{ marginTop: 8 }}>
+                {others.map((a) => <Link key={a.id} to={`/ciclo/area/${a.id}`} className="list-row"><AreaIcon area={a} size={24} /><span className="grow">{a.name}</span>{a.score_now != null && <span className="caption muted mono">{Number(a.score_now)}/10</span>}<Icon name="chevron" size={16} className="faint" /></Link>)}
+              </div>
+            </details>
+          )}
+
           <SectionHead title="Reflexões" action={<Link className="caption muted" to="/reflexoes">todas →</Link>} />
           {reflections.length ? (
             <div className="card flush list">
@@ -276,7 +297,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
           ) : <Empty>Cada ritual semanal fica guardado aqui.</Empty>}
 
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <Link className="btn ghost small" to="/ciclo/trimestre"><Icon name="sparkle" size={14} />Ritual do trimestre</Link>
+            <Link className="btn ghost small" to="/ciclo/trimestre"><Icon name="sparkle" size={14} />Ritual de novo ciclo</Link>
             {!ended && <button className="btn ghost small" onClick={close}>Encerrar ciclo antes do fim</button>}
             {ended && <button className="btn ghost small" onClick={close}>Encerrar sem o ritual</button>}
             <button className="btn ghost small" style={{ color: 'var(--danger)' }} onClick={() => setDeleting(true)}><Icon name="trash" size={14} />Apagar ciclo e recomeçar</button>
@@ -362,7 +383,7 @@ function GoalSheet({ open, onClose, cycle, areas, position, areaId }: { open: bo
   const { rows: refl } = useRows<Reflection>('reflections', { eq: { kind: 'reset' } })
   if (!open) return null
   // inspiração: as melhorias que você escreveu no ritual do trimestre
-  const insp = (() => { try { const st = JSON.parse(refl.find((r) => r.prompt === 'ritual-trimestre')?.answers[0] ?? '{}'); return Object.values(st.improve ?? {}).flat().filter(Boolean) as string[] } catch { return [] } })()
+  const insp = (() => { try { const st = JSON.parse(refl.find((r) => r.prompt === 'ritual-trimestre')?.answers[0] ?? '{}'); return [...Object.values(st.improve ?? {}).flat(), ...Object.values((st.refl ?? {}) as Record<string, { improve?: string[] }>).flatMap((r) => r.improve ?? [])].filter(Boolean) as string[] } catch { return [] } })()
   const now = weekOf(cycle)
   return <GoalWizard cycleId={cycle.id} areas={areas} existing={steps} position={position} areaId={areaId} inspiration={insp} current={Math.min(Math.max(now, 1), execWeeks(cycle))} weeks={execWeeks(cycle)} onDone={onClose} onCancel={onClose} />
 }
@@ -474,8 +495,8 @@ export function AreaPage() {
 
         <div className="stack">
           <button className="card stack" style={{ textAlign: 'left', gap: 6 }} onClick={() => setEditing(true)}>
-            <span className="mono muted">POR QUE IMPORTA</span>
-            {area.why ? <span className="serif" style={{ fontSize: 22, lineHeight: '28px' }}>“{area.why}”</span> : <span className="muted">Escreva por que esta área importa para você.</span>}
+            <span className="mono muted">{area.focus ? 'NO FIM DO CICLO EU QUERO TER' : 'POR QUE IMPORTA'}</span>
+            {area.why ? <span className="serif" style={{ fontSize: 22, lineHeight: '28px' }}>“{area.why}”</span> : <span className="muted">{area.focus ? 'O que você quer ter no fim do ciclo nesta área?' : 'Escreva por que esta área importa para você.'}</span>}
           </button>
           <button className="card stack" style={{ textAlign: 'left', gap: 6 }} onClick={() => setEditing(true)}>
             <span className="mono muted">O QUE QUERO MELHORAR</span>
@@ -566,7 +587,7 @@ function AreaEdit({ area, onDone }: { area: Area; onDone: () => void }) {
       <span className="mono muted">Nota de 0 a 10</span>
       <ScoreSlider label="Hoje" value={area.score_now} onChange={(v) => set({ score_now: v })} />
       <ScoreSlider label="Onde quero chegar" value={area.score_goal} onChange={(v) => set({ score_goal: v })} />
-      <label className="field"><span>Por que esta área importa</span><textarea className="input" rows={3} maxLength={2000} value={why} onChange={(e) => setWhy(e.target.value)} /></label>
+      <label className="field"><span>{area.focus ? 'No fim do ciclo eu quero TER…' : 'Por que esta área importa'}</span><textarea className="input" rows={3} maxLength={2000} value={why} onChange={(e) => setWhy(e.target.value)} /></label>
       <label className="field"><span>O que quero melhorar</span><textarea className="input" rows={3} maxLength={2000} value={improve} onChange={(e) => setImprove(e.target.value)} /></label>
       <button className="btn primary block">Guardar</button>
     </form>

@@ -2,92 +2,51 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { insert, update } from '../lib/db'
 import { useRows } from '../lib/hooks'
-import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/dates'
+import { addDays, fmt, fromYmd, toIso, weekStart, ymd } from '../lib/dates'
 import { currentCycle, execWeeks, newCycleDates, score, totalWeeks, weekOf } from '../lib/cycle'
+import { AREA_CATALOG, presetArea } from '../lib/areas'
 import { DurationPicker } from '../components/DurationPicker'
 import { useApp } from '../lib/app'
-import { inMonth, DEFAULT_RULE, ym } from '../lib/finance'
-import { money, parseMoney } from '../lib/money'
 import { useAuth } from '../lib/auth'
-import type { Area, BudgetRule, CalEvent, Cycle, Goal, Habit, Income, Pot, Reflection, Step, Task } from '../lib/types'
+import type { Area, CalEvent, Cycle, Goal, Habit, Reflection, Step, Task } from '../lib/types'
 import { AreaIcon, AreaTag, Empty } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { ListInput, RailSteps } from '../components/ListInput'
-import { GoalWizard, habitDays } from '../components/GoalWizard'
 import { type ShellCtx } from '../components/Shell'
 
 // ---------------------------------------------------------------- estado do ritual (guardado como JSON numa reflexão)
+interface Win { t: string; how: string }
+interface Miss { t: string; why: string }
+interface AreaRefl { score: number | null; good: Win[]; bad: Miss[]; improve: string[] }
+type Kind = 'project' | 'habit' | 'both'
+type ItemType = 'projeto' | 'habito' | 'tarefa' | 'evento'
+interface Meta { id: string; area: string; t: string; kind: Kind; done: string }
+interface Item { id: string; area: string; meta: string | null; t: string; type: ItemType; date?: string; days?: number[]; week?: number }
 interface RT {
-  step: number
-  reset: { t: string; done: boolean }[]
-  memo: string[]; good: string[]; notAgain: string[]; wins: Record<string, string[]>; regrets: string[]; rituals: string[]
-  peoplePos: string[]; peopleNeg: string[]; resGood: string[]; resBad: string[]; resWhy: string; who: string[]
-  words: string[]; wordsWhy: string
-  notes: Record<string, { why: string; how: string }>
-  improveText: string; improve: Record<string, string[]>
-  focus: string[]; no: string[]; newCycleId?: string
-  weeks?: number; start?: string
-  rewards: { t: string; when: string }[]
-  dates: string[]; fun: { t: string; week: number }[]; weekend: string[]
-  financeGoal: string; makePot: boolean
-  courses: { t: string; size: string; pace: string }[]; sysIn: string; sysOut: string
-  focusWeek: string[]; finished?: boolean
+  v: 2; step: number; sub: number
+  reflect: string[]; created: string[]; refl: Record<string, AreaRefl>
+  focus: string[]; vision: Record<string, string>
+  rewards: { t: string; area: string }[]
+  words: string[]; who: string[]
+  metas: Meta[]; items: Item[]
+  ideas: string[]
+  newCycleId?: string; weeks?: number; start?: string; finished?: boolean
 }
-const RESET = ['Arrumar armários e separar doações', 'Limpar arquivos do computador', 'Zerar o Drive', 'Apagar tarefas antigas', 'Lavar mochilas e bolsas', 'Apagar fotos do celular', 'Resetar o financeiro e pagar pendências', 'Apagar apps que não uso', 'Arrumar a mesa de trabalho']
-const empty = (): RT => ({
-  step: 0, reset: RESET.map((t) => ({ t, done: false })), memo: [], good: [], notAgain: [], wins: {}, regrets: [], rituals: [],
-  peoplePos: [], peopleNeg: [], resGood: [], resBad: [], resWhy: '', who: [], words: [], wordsWhy: '', notes: {}, improveText: '', improve: {},
-  focus: [], no: [], rewards: [], dates: [], fun: [], weekend: [], financeGoal: '', makePot: true, courses: [], sysIn: 'metas, tarefas, agenda e visão geral', sysOut: '', focusWeek: [],
-})
+const empty = (): RT => ({ v: 2, step: 0, sub: 0, reflect: [], created: [], refl: {}, focus: [], vision: {}, rewards: [], words: [], who: [], metas: [], items: [], ideas: [] })
+const blankRefl = (): AreaRefl => ({ score: null, good: [], bad: [], improve: [] })
+const uid = () => Math.random().toString(36).slice(2, 10)
 
-// as etapas, na ordem do Figma
-const P1 = ['reset', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9']
-const P2 = ['visao', 'notas', 'melhorias', 'prioridade', 'metas', 'nao']
-const P3 = ['recompensas', 'datas', 'legais', 'financas', 'recursos', 'foco', 'resumo']
-const ORDER = ['inicio', ...P1, 'pausa1', ...P2, 'pausa2', ...P3]
-const P2_NAMES = ['Visão', 'Notas das áreas', 'Melhorias', 'Priorização', 'Metas', 'Dizer não']
-const P3_NAMES = ['Recompensas', 'Datas', 'Coisas legais', 'Finanças', 'Recursos', 'Semana de foco', 'Resumo']
-const QUESTIONS: Record<string, [string, string?]> = {
-  q1: ['Quais foram os dias mais memoráveis do trimestre, e por quê?'],
-  q2: ['O que deu certo e você quer fazer de novo?'],
-  q3: ['O que você definitivamente não quer repetir?', 'Seja gentil consigo. Isto é para aprender, não para se culpar.'],
-  q4: ['Quais foram as suas maiores conquistas?', 'Até 2 por área. Pode deixar em branco.'],
-  q5: ['Do que você se arrependeu neste trimestre?'],
-  q6: ['Quais rituais você quer ter no próximo ciclo?', 'Hábitos pequenos que dão o tom do trimestre.'],
-  q7: ['Que pessoas marcaram o seu trimestre?'],
-  q8: ['Que recursos você usou? O que deu certo e o que deu errado?'],
-  q9: ['Como você quer se ver no final do ciclo?', 'Who is she?'],
+const P1 = ['areas', 'reflexao']
+const P2 = ['foco', 'tipos', 'recompensas', 'palavras', 'metas']
+const P3 = ['datas', 'ideias', 'distribuir']
+const ORDER = ['inicio', ...P1, ...P2, ...P3]
+const NAMES: Record<string, string> = {
+  areas: 'Escolher áreas', reflexao: 'Refletir', foco: 'Foco', tipos: 'Hábito, projeto, mix', recompensas: 'Recompensas', palavras: '3 palavras', metas: 'Metas e projetos',
+  datas: 'Datas do ciclo', ideias: 'Ideias', distribuir: 'Revisar e distribuir',
 }
-
-// melhorias: separa o texto livre por área pelas palavras
-const AREA_WORDS: Record<string, RegExp> = {
-  trabalho: /trabalh|est[aá]gio|emprego|client|freela|portf[oó]lio|carreira|demanda|vaga|entrevista/,
-  estudos: /estud|curso|\bux\b|aula|\bler\b|leitura|livro|faculdade|cmu|mestrado|aprender/,
-  saude: /sa[uú]de|caminh|corr|academia|gin[aá]sio|treino|dormir|sono|comer|aliment|m[eé]dic|dentista|check-up|exerc/,
-  relacoes: /fam[ií]lia|amig|namor|m[aã]e|\bpai\b|v[oó]\b|irm[aã]|falar mais|conversar|relac/,
-  financas: /renda|dinheiro|poupar|guardar|economi|d[ií]vida|finan|investi|reserva/,
-  eu: /terapia|journal|cabe[cç]a|medita|autoestima|hobby|criativ|autocuidado|mente|eu mesma/,
-}
-export function splitImprove(text: string, areas: Area[]) {
-  const parts = text.split(/[,;.\n]|\se\s(?=[a-záéíóú]+r\b)/i).map((x) => x.trim().replace(/^(e|quero|também)\s+/i, '')).filter((x) => x.length > 2)
-  const out: Record<string, string[]> = {}
-  for (const p of parts) {
-    const t = p.toLowerCase()
-    const a = areas.find((x) => t.includes(x.name.toLowerCase())) ?? areas.find((x) => AREA_WORDS[x.color]?.test(t))
-    const k = a?.id ?? 'sem-area'
-    ;(out[k] ??= []).push(p.charAt(0).toUpperCase() + p.slice(1))
-  }
-  return out
-}
-
-/** Frequência escrita solta: “↻ 2x por semana”, “↻ diário”, “↻ 5 por dia”. */
-export function parseFreq(s: string) {
-  const t = s.toLowerCase()
-  const m = t.match(/(\d+\s*x?\s*(por|na|\/)\s*(dia|semana|m[eê]s))|a cada \d+ dias|di[aá]ri[oa]|todo dia|todos os dias|toda semana|semanal|mensal|dias [uú]teis/)
-  if (!m) return null
-  const v = m[0].replace('todos os dias', 'diário').replace('todo dia', 'diário').replace(/di[aá]ri[oa]/, 'diário')
-  return v
-}
+export const KIND_NAME: Record<Kind, string> = { habit: 'Hábito', project: 'Projeto', both: 'Mix' }
+const TYPE_NAME: Record<ItemType, string> = { projeto: 'Projeto', habito: 'Hábito', tarefa: 'Tarefa', evento: 'Evento' }
+const DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
 // ---------------------------------------------------------------- página
 export function Trimestre() {
@@ -102,26 +61,28 @@ export function Trimestre() {
   const { rows: goals } = useRows<Goal>('goals')
   const { rows: steps } = useRows<Step>('steps')
 
-  const row = refl.filter((r) => r.prompt === 'ritual-trimestre').find((r) => { try { return !JSON.parse(r.answers[0] ?? '{}').finished } catch { return false } })
-  const saved = useMemo<RT | null>(() => { try { return row ? { ...empty(), ...JSON.parse(row.answers[0]) } : null } catch { return null } }, [row])
+  const row = refl.filter((r) => r.prompt === 'ritual-trimestre').find((r) => { try { const j = JSON.parse(r.answers[0] ?? '{}'); return !j.finished } catch { return false } })
+  const saved = useMemo<RT | null>(() => {
+    try { const j = row ? JSON.parse(row.answers[0]) : null; return j && j.v === 2 ? { ...empty(), ...j } : null } catch { return null }
+  }, [row])
   const [st, setSt] = useState<RT | null>(null)
   const s = st ?? saved ?? empty()
-  const set = (p: Partial<RT>) => setSt({ ...s, ...p })
+  const sRef = useRef(s); sRef.current = s
+  const set = (p: Partial<RT>) => setSt({ ...sRef.current, ...p })
   const rowId = useRef<string | null>(null)
   rowId.current = row?.id ?? rowId.current
+  const [busy, setBusy] = useState(false)
 
   const newCycle = cycles.find((c) => c.id === s.newCycleId)
   const old = currentCycle(cycles.filter((c) => c.id !== s.newCycleId))
   const oldGoals = goals.filter((g) => g.cycle_id === old?.id)
   const oldSteps = steps.filter((x) => oldGoals.some((g) => g.id === x.goal_id))
-  const newGoals = goals.filter((g) => g.cycle_id === newCycle?.id)
-  const newSteps = steps.filter((x) => newGoals.some((g) => g.id === x.goal_id))
 
   // guarda sozinho, um pouco depois de cada mudança (dá para pausar e voltar)
   useEffect(() => {
     if (!st) return
     const t = setTimeout(async () => {
-      const body = { answers: [JSON.stringify(st)], title: 'Ritual do trimestre' }
+      const body = { answers: [JSON.stringify(st)], title: 'Ritual do ciclo' }
       if (rowId.current) await update<Reflection>('reflections', rowId.current, body)
       else { const r = await insert<Reflection>('reflections', { cycle_id: old?.id ?? null, kind: 'reset', week: null, prompt: 'ritual-trimestre', score: null, ...body }); rowId.current = r.id }
     }, 500)
@@ -130,77 +91,106 @@ export function Trimestre() {
 
   if (loading) return <div className="page"><p className="muted">Carregando…</p></div>
   const id = ORDER[s.step]
-  const go = (i: number) => { set({ step: Math.max(0, Math.min(ORDER.length - 1, i)) }); window.scrollTo({ top: 0 }) }
-  const next = () => go(s.step + 1)
-  const part = P1.includes(id) ? 1 : P2.includes(id) || id === 'pausa1' ? 2 : P3.includes(id) || id === 'pausa2' ? 3 : 0
+  const areaOf = (k: string) => areas.find((a) => a.id === k)
+  const reflectAreas = s.reflect.map(areaOf).filter((a): a is Area => !!a)
+  const focusAreas = s.focus.map(areaOf).filter((a): a is Area => !!a)
+  const subList = id === 'reflexao' ? reflectAreas : id === 'metas' ? focusAreas : []
+  const go = (step: number, sub = 0) => { set({ step: Math.max(0, Math.min(ORDER.length - 1, step)), sub }); window.scrollTo({ top: 0 }) }
+  const next = () => (subList.length && s.sub < subList.length - 1 ? go(s.step, s.sub + 1) : go(s.step + 1))
+  const back = () => (subList.length && s.sub > 0 ? go(s.step, s.sub - 1) : (() => { const p = ORDER[s.step - 1]; const n = p === 'reflexao' ? reflectAreas.length : p === 'metas' ? focusAreas.length : 1; go(s.step - 1, Math.max(0, n - 1)) })())
+  const part = P1.includes(id) ? 1 : P2.includes(id) ? 2 : P3.includes(id) ? 3 : 0
 
-  // o próximo ciclo: começa quando o atual acaba (ou na próxima semana); a duração vem da escolha no início
+  // o próximo ciclo: começa quando o atual acaba (ou na próxima semana)
   const defStart = () => {
     const base = old ? addDays(fromYmd(old.ends_on), 1) : addDays(weekStart(new Date(), profile?.week_starts_on ?? 1), 7)
     return ymd(base < new Date() ? addDays(weekStart(new Date(), profile?.week_starts_on ?? 1), 7) : base)
   }
   const nextStart = newCycle?.starts_on ?? s.start ?? defStart()
   const nextWeeks = newCycle ? execWeeks(newCycle) : s.weeks ?? appSettings.default_weeks
+  const nextEnd = newCycleDates(nextStart, nextWeeks).ends_on
   async function setNext(p: { weeks?: number; start?: string }) {
     const w = p.weeks ?? nextWeeks, st0 = p.start ?? nextStart
     set({ weeks: w, start: st0 })
     if (newCycle) await update<Cycle>('cycles', newCycle.id, newCycleDates(st0, w))
   }
 
-  async function ensureCycle() {
-    if (newCycle) return newCycle
-    const start = nextStart
-    const d = fromYmd(start)
-    const c = await insert<Cycle>('cycles', { name: `Q${Math.floor(d.getMonth() / 3) + 1} · ${d.getFullYear()}`, ...newCycleDates(start, nextWeeks), status: 'planning', words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) })
-    setSt({ ...s, newCycleId: c.id })
-    return c
-  }
+  // quanto cada área está preenchida (para o resumo e o rail)
+  const filled = (k: string) => { const r = s.refl[k]; return !!r && (r.score != null || r.good.length > 0 || r.bad.length > 0 || r.improve.length > 0) }
+  const itemsWeek = proposeWeeks(s.items, nextWeeks)
 
   async function finish() {
-    const c = await ensureCycle()
-    // semana de foco: o que tem frequência de hábito vira hábito; o resto vira tarefa
-    for (const line of s.focusWeek) {
-      const f = parseFreq(line); const days = f ? habitDays(f) : null
-      const title = line.replace(/\(?↻?\s*(\d+\s*x?\s*(por|na|\/)\s*(dia|semana|m[eê]s)|a cada \d+ dias|di[aá]ri[oa]|todo dia|todos os dias|toda semana|semanal|mensal)\)?/i, '').replace(/[\s,·-]+$/, '').trim() || line
-      if (days && !/por dia/.test(f!)) await insert<Habit>('habits', { title, area_id: null, days, archived: false })
-      else await insert<Task>('tasks', { title, notes: f ? `Frequência: ${f}` : null, list_id: null, important: false, position: 0 })
+    if (busy) return
+    setBusy(true)
+    try {
+      const d = fromYmd(nextStart)
+      const c = newCycle ?? await insert<Cycle>('cycles', { name: `Q${Math.floor(d.getMonth() / 3) + 1} · ${d.getFullYear()}`, ...newCycleDates(nextStart, nextWeeks), status: 'planning', words: [], who_is_she: [] })
+      if (!newCycle) set({ newCycleId: c.id })
+      const weekDay = (w: number) => ymd(addDays(fromYmd(c.starts_on), (w - 1) * 7))
+      // metas
+      const gid: Record<string, string> = {}
+      for (const [i, m] of s.metas.filter((x) => x.t.trim() && s.focus.includes(x.area)).entries()) {
+        const g = await insert<Goal>('goals', { cycle_id: c.id, area_id: m.area, title: m.t.trim().slice(0, 200), done_definition: m.done.trim().slice(0, 500) || null, kind: m.kind, position: i })
+        gid[m.id] = g.id
+      }
+      // projetos viram passos nas semanas; tarefas, hábitos e eventos vão para os seus lugares
+      for (const [i, it] of itemsWeek.filter((x) => x.t.trim() && s.focus.includes(x.area)).entries()) {
+        const title = it.t.trim().slice(0, 200)
+        const g = it.meta ? gid[it.meta] : undefined
+        if (it.type === 'projeto' && g) await insert<Step>('steps', { goal_id: g, title, week: it.week ?? 1, detail: null, position: i })
+        else if (it.type === 'habito') await insert<Habit>('habits', { title: title.slice(0, 120), area_id: it.area, days: it.days?.length ? it.days : [0, 1, 2, 3, 4, 5, 6], archived: false })
+        else if (it.type === 'evento' && it.date) await insert<CalEvent>('events', { title, starts_at: toIso(it.date), ends_at: toIso(ymd(addDays(fromYmd(it.date), 1))), all_day: true, kind: 'appointment', area_id: it.area, location: null, notes: null, reminder_minutes: null })
+        else await insert<Task>('tasks', { title, notes: null, list_id: null, important: false, position: 0, area_id: it.area, due_on: weekDay(it.week ?? 1) })
+      }
+      // áreas: nota, melhorias, visão e foco
+      for (const a of areas) {
+        const r = s.refl[a.id]
+        const patch: Partial<Area> = { focus: s.focus.includes(a.id) }
+        if (r?.score != null) patch.score_now = r.score
+        if (r?.improve.length) patch.improve = r.improve.join('. ').slice(0, 2000)
+        if (s.focus.includes(a.id)) patch.why = (s.vision[a.id] ?? '').trim().slice(0, 2000) || null
+        if (s.created.includes(a.id) && !s.reflect.includes(a.id)) patch.archived = true
+        await update<Area>('areas', a.id, patch)
+      }
+      const base = { status: 'active' as const, words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) }
+      try { await update<Cycle>('cycles', c.id, { ...base, rewards: s.rewards.filter((r) => s.focus.includes(r.area)), ideas: s.ideas.slice(0, 60) }) }
+      catch { await update<Cycle>('cycles', c.id, base) } // banco ainda sem as colunas novas: guarda o resto
+      if (old && old.id !== c.id) await update<Cycle>('cycles', old.id, { status: 'closed' })
+      const fin = { ...s, newCycleId: c.id, finished: true }
+      if (rowId.current) await update<Reflection>('reflections', rowId.current, { answers: [JSON.stringify(fin)] })
+      toast(`${c.name} começou. Bom ciclo!`)
+      nav('/ciclo')
+    } catch (e) {
+      toast(`Não deu para começar o ciclo: ${e instanceof Error ? e.message : 'erro'}`)
     }
-    const goal = parseMoney(s.financeGoal)
-    if (goal && s.makePot) await insert<Pot>('pots', { name: `Meta do ${c.name}`, target_cents: goal, goal_id: null })
-    await update<Cycle>('cycles', c.id, { status: 'active', words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) })
-    if (old && old.id !== c.id) await update<Cycle>('cycles', old.id, { status: 'closed' })
-    const fin = { ...s, finished: true }
-    if (rowId.current) await update<Reflection>('reflections', rowId.current, { answers: [JSON.stringify(fin)] })
-    toast(`${c.name} começou. Bom ciclo!`)
-    nav('/')
+    setBusy(false)
   }
 
-  const prevWords = cycles.filter((c) => c.id !== s.newCycleId && c.words.length).slice(0, 4).reverse()
   const avgScore = (() => { const w = Array.from({ length: execWeeks(old) }, (_, i) => score(oldSteps.filter((x) => x.week === i + 1))).filter((v): v is number => v != null); return w.length ? Math.round(w.reduce((a, b) => a + b, 0) / w.length) : null })()
   const metGoals = oldGoals.filter((g) => { const x = oldSteps.filter((y) => y.goal_id === g.id); return x.length > 0 && x.every((y) => y.done_at) }).length
-  const qn = P1.indexOf(id)
+  const cur = subList[s.sub]
 
   return (
     <div className="page wide ritual-page">
       <aside className="ritual-rail">
-        <span className="mono muted">Ritual do trimestre</span>
-        <RailSteps title="1 · Olhar para trás" items={['Reset', 'Review']} active={part === 1 ? (id === 'reset' ? 0 : 1) : -1} done={s.step > ORDER.indexOf('pausa1') - 1 && part !== 1} onPick={(i) => go(ORDER.indexOf(i ? 'q1' : 'reset'))} />
-        {part === 1 && qn > 0 && <span className="caption muted" style={{ marginTop: -10, paddingLeft: 10 }}>pergunta {qn} de 9</span>}
-        <RailSteps title="2 · Decidir" items={P2_NAMES} active={P2.includes(id) ? P2.indexOf(id) : -1} done={s.step > ORDER.indexOf('nao')} onPick={(i) => go(ORDER.indexOf(P2[i]))} />
-        <RailSteps title="3 · Organizar" items={P3_NAMES} active={P3.includes(id) ? P3.indexOf(id) : -1} done={false} onPick={(i) => go(ORDER.indexOf(P3[i]))} />
+        <span className="mono muted">Ritual do ciclo</span>
+        <RailSteps title="1 · Olhar para trás" items={P1.map((k) => NAMES[k])} active={part === 1 ? P1.indexOf(id) : -1} done={s.step > ORDER.indexOf('reflexao')} onPick={(i) => go(ORDER.indexOf(P1[i]))} />
+        {id === 'reflexao' && cur && <span className="caption muted" style={{ marginTop: -10, paddingLeft: 10 }}>{cur.name} · {s.sub + 1} de {subList.length}</span>}
+        <RailSteps title="2 · Decidir" items={P2.map((k) => NAMES[k])} active={part === 2 ? P2.indexOf(id) : -1} done={s.step > ORDER.indexOf('metas')} onPick={(i) => go(ORDER.indexOf(P2[i]))} />
+        {id === 'metas' && cur && <span className="caption muted" style={{ marginTop: -10, paddingLeft: 10 }}>{cur.name} · {s.sub + 1} de {subList.length}</span>}
+        <RailSteps title="3 · Organizar" items={P3.map((k) => NAMES[k])} active={part === 3 ? P3.indexOf(id) : -1} done={false} onPick={(i) => go(ORDER.indexOf(P3[i]))} />
         <span className="caption faint">Dá para pausar a qualquer momento. O app guarda onde você parou.</span>
       </aside>
 
       <section className="stack ritual-main">
         <div className="row between">
-          <span className="mono muted">{part ? `Parte ${part} de 3` : 'Início'}</span>
+          <span className="mono muted">{part ? `Parte ${part} de 3 · ${NAMES[id]}` : 'Início'}</span>
           <Link className="btn ghost small" to="/ciclo"><Icon name="x" size={14} />Pausar</Link>
         </div>
 
         {id === 'inicio' && (
           <div className="stack">
             {old && <span className="mono muted">{weekOf(old) >= totalWeeks(old) ? `semana de revisão · ${fmt(addDays(fromYmd(old.ends_on), -6), 'd MMM')} a ${fmt(fromYmd(old.ends_on), 'd MMM')}` : old.name}</span>}
-            <h1 className="serif-title" style={{ fontSize: 40, lineHeight: '44px' }}>{old ? `O ciclo ${old.name} ${weekOf(old) > execWeeks(old) ? 'terminou' : 'está acabando'}. Hora de olhar para trás e desenhar o próximo.` : 'Hora de desenhar o seu próximo trimestre.'}</h1>
+            <h1 className="serif-title" style={{ fontSize: 40, lineHeight: '44px' }}>{old ? `O ciclo ${old.name} ${weekOf(old) > execWeeks(old) ? 'terminou' : 'está acabando'}. Hora de olhar para trás e desenhar o próximo.` : 'Hora de desenhar o seu próximo ciclo.'}</h1>
             {old && (
               <div className="habit-stats">
                 <div className="card stack" style={{ gap: 0 }}><span className="big">{execWeeks(old)}</span><span className="caption muted">semanas</span></div>
@@ -210,284 +200,81 @@ export function Trimestre() {
             )}
             <span className="mono muted">O ritual · 3 partes, no seu ritmo</span>
             <div className="card flush list">
-              {[['Olhar para trás', 'Reset e 9 perguntas do review · ~30 min'], ['Decidir', 'Visão, notas, foco, metas e o que fica de fora · ~30 min'], ['Organizar', 'Recompensas, datas, finanças, recursos e o 1º mês · ~20 min']].map(([t, h], i) => (
+              {[['Olhar para trás', 'Cada área: o que funcionou, o que não funcionou e o que melhorar'], ['Decidir', 'Áreas de foco, o que você quer TER, recompensas, 3 palavras, metas e projetos'], ['Organizar', 'Datas do ciclo, lista de ideias e a distribuição pelas semanas']].map(([t, h], i) => (
                 <div key={t} className="list-row"><span className="ritual-num">{i + 1}</span><div className="stack" style={{ gap: 0 }}><span className="medium">{t}</span><span className="caption muted">{h}</span></div></div>
               ))}
             </div>
             <span className="mono muted" style={{ marginTop: 8 }}>O próximo ciclo</span>
             <DurationPicker weeks={nextWeeks} start={nextStart} onChange={(w) => setNext({ weeks: w })} />
             <label className="field"><span>Começa em</span><input className="input" type="date" value={nextStart} onChange={(e) => e.target.value && setNext({ start: e.target.value })} /></label>
-            <p className="caption muted" style={{ margin: 0 }}>Dá para pausar a qualquer momento. O app guarda onde você parou.</p>
           </div>
         )}
 
-        {id === 'reset' && (
-          <div className="stack">
-            <span className="mono muted">Parte 1 · Reset</span>
-            <h1 className="serif-title">Antes de planejar, abra espaço.</h1>
-            <p className="muted" style={{ margin: 0 }}>Marque o que já fez. Não precisa ser tudo hoje.</p>
-            <div className="card flush list">
-              {s.reset.map((r, i) => (
-                <label key={i} className="list-row"><input type="checkbox" checked={r.done} onChange={() => set({ reset: s.reset.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) })} />
-                  <span className={'grow' + (r.done ? ' done-text' : '')}>{r.t}</span></label>
-              ))}
-              <form className="list-row" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('r') as HTMLInputElement; if (f.value.trim()) set({ reset: [...s.reset, { t: f.value.trim(), done: false }] }); f.value = '' }}>
-                <Icon name="plus" size={16} className="faint" /><input name="r" className="input bare grow" placeholder="Adicionar item ao seu reset" maxLength={120} aria-label="Novo item do reset" /></form>
-            </div>
-          </div>
-        )}
+        {id === 'areas' && <AreasPick areas={areas} s={s} set={set} />}
 
-        {qn > 0 && (
-          <div className="stack">
-            <span className="mono muted">Review · pergunta {qn}</span>
-            <h1 className="serif-title">{QUESTIONS[id][0]}</h1>
-            {QUESTIONS[id][1] && id !== 'q9' && <p className="muted" style={{ margin: 0 }}>{QUESTIONS[id][1]}</p>}
-            {id === 'q1' && <ListInput label="Dias memoráveis" items={s.memo} onChange={(v) => set({ memo: v })} />}
-            {id === 'q2' && <ListInput label="Deu certo" items={s.good} onChange={(v) => set({ good: v })} />}
-            {id === 'q3' && <ListInput label="Não repetir" items={s.notAgain} onChange={(v) => set({ notAgain: v })} />}
-            {id === 'q4' && areas.map((a) => (
-              <div key={a.id} className="stack" style={{ gap: 6 }}>
-                <span className="row" style={{ gap: 8 }}><AreaIcon area={a} size={24} /><span className="medium">{a.name}</span></span>
-                <ListInput label={`Conquistas em ${a.name}`} items={s.wins[a.id] ?? []} max={2} placeholder="Escreva…" onChange={(v) => set({ wins: { ...s.wins, [a.id]: v } })} />
-              </div>
-            ))}
-            {id === 'q5' && <ListInput label="Arrependimentos" items={s.regrets} onChange={(v) => set({ regrets: v })} />}
-            {id === 'q6' && <>
-              <ListInput label="Rituais" items={s.rituals} onChange={(v) => set({ rituals: v })} />
-              <div className="card soft caption"><span className="mono muted">Dica</span><br />Na etapa de metas, rituais podem virar hábitos com frequência.</div>
-            </>}
-            {id === 'q7' && <People s={s} set={set} />}
-            {id === 'q8' && <>
-              <span className="mono muted">Deu certo</span><ListInput label="Recursos que deram certo" items={s.resGood} onChange={(v) => set({ resGood: v })} placeholder="Ex.: planner de papel" />
-              <span className="mono muted">Deu errado</span><ListInput label="Recursos que deram errado" items={s.resBad} onChange={(v) => set({ resBad: v })} placeholder="Ex.: app de hábitos" />
-              <label className="field"><span>Por quê? (opcional)</span><textarea className="input" rows={2} maxLength={1000} value={s.resWhy} placeholder="O papel funcionou porque eu via tudo de uma vez…" onChange={(e) => set({ resWhy: e.target.value })} /></label>
-            </>}
-            {id === 'q9' && <>
-              <span className="serif" style={{ fontSize: 28 }}>Who is she?</span>
-              <ListInput label="Who is she" items={s.who} onChange={(v) => set({ who: v })} placeholder="Ela…" max={20} />
-            </>}
-          </div>
-        )}
+        {id === 'reflexao' && (cur ? <Reflect key={cur.id} area={cur} r={s.refl[cur.id] ?? blankRefl()} onChange={(r) => set({ refl: { ...s.refl, [cur.id]: r } })} />
+          : <Empty>Escolha pelo menos uma área na etapa anterior.</Empty>)}
 
-        {id === 'pausa1' && (
-          <Pause n={1} title="Parte 1 feita. Respira." text="Você olhou para trás com calma. A parte 2 decide o que vem: visão, áreas, metas e o que fica de fora."
-            facts={[['Perguntas respondidas', `${[s.memo, s.good, s.notAgain, Object.values(s.wins).flat(), s.regrets, s.rituals, [...s.peoplePos, ...s.peopleNeg], [...s.resGood, ...s.resBad], s.who].filter((x) => x.length).length} de 9`], ['Who is she?', `${s.who.length} frase${s.who.length === 1 ? '' : 's'}`], ['Próxima parte', 'Decidir · ~30 min']]} />
-        )}
+        {id === 'foco' && <Foco areas={reflectAreas} s={s} set={set} />}
 
-        {id === 'visao' && (
-          <div className="stack">
-            <span className="mono muted">Visão</span>
-            <h1 className="serif-title">Quais palavras vão definir este trimestre?</h1>
-            <p className="muted" style={{ margin: 0 }}>Três palavras e o porquê.</p>
-            <div className="wordchips">{s.words.map((w) => <button key={w} onClick={() => set({ words: s.words.filter((x) => x !== w) })} aria-label={`Tirar ${w}`}>{w} ✕</button>)}</div>
-            {s.words.length < 3 && <form onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('w') as HTMLInputElement; const v = f.value.trim().toLowerCase(); if (v && !s.words.includes(v)) set({ words: [...s.words, v] }); f.value = '' }}>
-              <input name="w" className="input" placeholder={['coragem', 'estudo', 'autoconfiança'][s.words.length]} maxLength={30} aria-label="Palavra do trimestre" /></form>}
-            <label className="field"><span>Por quê?</span><input className="input" value={s.wordsWhy} maxLength={300} onChange={(e) => set({ wordsWhy: e.target.value })} /></label>
-            {prevWords.length > 0 && <>
-              <span className="mono muted">Seus trimestres anteriores</span>
-              <div className="card flush list">{prevWords.map((c) => <div key={c.id} className="list-row"><span className="mono muted" style={{ width: 80 }}>{c.name}</span><span>{c.words.join(' · ')}</span></div>)}</div>
-            </>}
-          </div>
-        )}
-
-        {id === 'notas' && <Notas areas={areas} s={s} set={set} />}
-
-        {id === 'melhorias' && (
-          <div className="stack">
-            <span className="mono muted">Melhorias</span>
-            <h1 className="serif-title">O que você quer melhorar em cada área?</h1>
-            <p className="muted" style={{ margin: 0 }}>Escreva do seu jeito, quanto quiser. O app separa por área para você revisar.</p>
-            <label className="field"><span className="mono">Escreva livremente</span>
-              <textarea className="input" rows={5} maxLength={3000} value={s.improveText} placeholder="Quero me organizar melhor no trabalho e conseguir um estágio, voltar a caminhar, falar mais com a minha família…"
-                onChange={(e) => set({ improveText: e.target.value })} onBlur={() => s.improveText.trim() && set({ improve: splitImprove(s.improveText, areas) })} /></label>
-            {s.improveText.trim() && <button className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => set({ improve: splitImprove(s.improveText, areas) })}>Separar por área</button>}
-            {Object.keys(s.improve).length > 0 && (
-              <div className="card stack" style={{ gap: 10 }}>
-                <div className="row between"><span className="mono muted">Entendi assim · revise</span><span className="caption muted">{Object.keys(s.improve).filter((k) => k !== 'sem-area').length} áreas</span></div>
-                {[...areas.map((a) => a.id), 'sem-area'].filter((k) => s.improve[k]?.length).map((k) => {
-                  const a = areas.find((x) => x.id === k)
-                  return (
-                    <div key={k} className="stack" style={{ gap: 4 }}>
-                      {a ? <AreaTag area={a} /> : <span className="caption muted">Sem área (escolha uma)</span>}
-                      {s.improve[k].map((t, i) => (
-                        <div key={i} className="row" style={{ gap: 8 }}>
-                          <input className="input bare grow" defaultValue={t} maxLength={200} aria-label="Melhoria" onBlur={(e) => { const n = { ...s.improve }; n[k] = [...n[k]]; n[k][i] = e.target.value; set({ improve: n }) }} />
-                          <select className="input" style={{ width: 'auto' }} value={k} aria-label="Área" onChange={(e) => { const n = { ...s.improve }; n[k] = n[k].filter((_, j) => j !== i); (n[e.target.value] ??= []); n[e.target.value] = [...n[e.target.value], t]; set({ improve: n }) }}>
-                            {areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}<option value="sem-area">Sem área</option>
-                          </select>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {id === 'prioridade' && (
-          <div className="stack">
-            <span className="mono muted">Priorização</span>
-            <h1 className="serif-title">Em quais áreas você vai focar neste ciclo?</h1>
-            <p className="muted" style={{ margin: 0 }}>Escolha até 4. As outras ficam em manutenção, sem culpa.</p>
-            <div className="area-pick">
-              {areas.filter((a) => !a.is_fixed).map((a) => {
-                const on = s.focus.includes(a.id)
-                return <button key={a.id} className={'area-card' + (on ? ' on' : '')} aria-pressed={on} disabled={!on && s.focus.length >= 4}
-                  style={on ? { background: `var(--${a.color}-bg)`, color: `var(--${a.color}-fg)` } : undefined}
-                  onClick={() => set({ focus: on ? s.focus.filter((x) => x !== a.id) : [...s.focus, a.id] })}>
-                  <div className="row between"><AreaIcon area={a} size={30} />{on && <Icon name="check" size={16} />}</div>
-                  <span className="medium">{a.name}</span>
-                  {s.improve[a.id]?.[0] && <span className="caption" style={{ opacity: 0.8 }}>{s.improve[a.id][0]}</span>}
-                </button>
-              })}
-            </div>
-            <span className="caption muted">{s.focus.length} de 4 escolhidas</span>
-          </div>
-        )}
-
-        {id === 'metas' && <Metas s={s} weeks={nextWeeks} areas={areas} newCycle={newCycle} goals={newGoals} steps={newSteps} ensureCycle={ensureCycle} />}
-
-        {id === 'nao' && (
-          <div className="stack">
-            <span className="mono muted">Dizer não</span>
-            <h1 className="serif-title">O que você não vai abraçar neste ciclo?</h1>
-            <p className="muted" style={{ margin: 0 }}>Com as metas definidas, decida o que fica de fora para elas caberem. Não precisa ser um não completo: pode ser “agora não” ou “sim, mas menos”.</p>
-            <ListInput label="O que fica de fora" items={s.no} onChange={(v) => set({ no: v })} placeholder="Ex.: novos projetos de voluntariado" />
-          </div>
-        )}
-
-        {id === 'pausa2' && (
-          <Pause n={2} title="Parte 2 feita. Falta pouco." text="Metas e o que fica de fora estão definidos. A parte 3 organiza o trimestre: recompensas, datas, finanças e o 1º mês."
-            facts={[['Metas do ciclo', String(newGoals.length)], ['O que fica de fora', `${s.no.length} ite${s.no.length === 1 ? 'm' : 'ns'}`], ['Próxima parte', 'Organizar · ~20 min']]} />
-        )}
+        {id === 'tipos' && <Tipos />}
 
         {id === 'recompensas' && (
           <div className="stack">
-            <span className="mono muted">Recompensas</span>
             <h1 className="serif-title">Como você vai comemorar?</h1>
-            <p className="muted" style={{ margin: 0 }}>Sem ser só comida. Ligue cada recompensa a um marco.</p>
-            <div className="card flush list">
-              {s.rewards.map((r, i) => (
-                <div key={i} className="list-row" style={{ flexWrap: 'wrap', rowGap: 6 }}>
-                  <span aria-hidden>★</span>
-                  <div className="grow stack" style={{ gap: 0, minWidth: 180 }}><span>{r.t}</span><span className="caption muted">quando: {r.when}</span></div>
-                  <button className="faint" aria-label={`Tirar ${r.t}`} onClick={() => set({ rewards: s.rewards.filter((_, j) => j !== i) })}><Icon name="x" size={14} /></button>
+            <p className="muted" style={{ margin: 0 }}>Pelo menos uma recompensa por área de foco. Sem ser só comida.</p>
+            {focusAreas.length ? focusAreas.map((a) => {
+              const mine = s.rewards.filter((r) => r.area === a.id).map((r) => r.t)
+              return (
+                <div key={a.id} className="stack" style={{ gap: 6 }}>
+                  <span className="row" style={{ gap: 8 }}><AreaIcon area={a} size={24} /><span className="medium grow">{a.name}</span>{!mine.length && <span className="caption muted">falta 1</span>}</span>
+                  <ListInput label={`Recompensas de ${a.name}`} items={mine} max={6} placeholder="Ex.: um jantar no meu restaurante favorito"
+                    onChange={(v) => set({ rewards: [...s.rewards.filter((r) => r.area !== a.id), ...v.map((t) => ({ t, area: a.id }))] })} />
                 </div>
-              ))}
-              <form className="list-row" style={{ flexWrap: 'wrap', rowGap: 8 }} onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (f.elements.namedItem('t') as HTMLInputElement).value.trim(); const w = (f.elements.namedItem('w') as HTMLSelectElement).value; if (!t) return; set({ rewards: [...s.rewards, { t, when: w }] }); f.reset() }}>
-                <Icon name="plus" size={16} className="faint" />
-                <input name="t" className="input bare grow" style={{ minWidth: 180 }} placeholder="Ex.: comprar um perfume" maxLength={120} aria-label="Recompensa" />
-                <select name="w" className="input" style={{ width: 'auto' }} aria-label="Quando">
-                  <option>4 semanas seguidas ≥ 85%</option>
-                  {newGoals.map((g) => <option key={g.id}>Meta “{g.title}” concluída</option>)}
-                  <option>Fim do ciclo</option><option>Fim do 1º mês</option>
-                </select>
-                <button className="btn secondary small">Adicionar</button>
-              </form>
-            </div>
+              )
+            }) : <Empty>Escolha as áreas de foco primeiro.</Empty>}
           </div>
         )}
 
-        {id === 'datas' && <Datas s={s} set={set} cycle={newCycle} ensureCycle={ensureCycle} />}
-
-        {id === 'legais' && (
+        {id === 'palavras' && (
           <div className="stack">
-            <span className="mono muted">Plano do trimestre</span>
-            <h1 className="serif-title">Que coisas legais você quer encaixar no ciclo?</h1>
-            <p className="muted" style={{ margin: 0 }}>Eventos para pensar em ir, programas e comprinhas.</p>
-            <div className="card flush list">
-              {s.fun.map((f, i) => (
-                <div key={i} className="list-row"><span className="grow">{f.t}</span>
-                  <select className="input" style={{ width: 'auto' }} value={f.week} aria-label={`Semana de ${f.t}`} onChange={(e) => set({ fun: s.fun.map((x, j) => (j === i ? { ...x, week: Number(e.target.value) } : x)) })}>
-                    <option value={0}>sem semana</option>{Array.from({ length: nextWeeks }, (_, w) => <option key={w} value={w + 1}>talvez S{w + 1}</option>)}</select>
-                  <button className="faint" aria-label={`Tirar ${f.t}`} onClick={() => set({ fun: s.fun.filter((_, j) => j !== i) })}><Icon name="x" size={14} /></button></div>
-              ))}
-              <form className="list-row" onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('t') as HTMLInputElement; if (f.value.trim()) set({ fun: [...s.fun, { t: f.value.trim(), week: 0 }] }); f.value = '' }}>
-                <Icon name="plus" size={16} className="faint" /><input name="t" className="input bare grow" placeholder="Ex.: run club, aula de cerâmica" maxLength={120} aria-label="Coisa legal" /></form>
-            </div>
-            <span className="mono muted">Programa de fim de semana</span>
-            <ListInput label="Programas de fim de semana" items={s.weekend} onChange={(v) => set({ weekend: v })} placeholder="Ex.: piquenique no parque" />
+            <h1 className="serif-title">3 palavras para inspirar este ciclo</h1>
+            <div className="wordchips">{s.words.map((w) => <button key={w} onClick={() => set({ words: s.words.filter((x) => x !== w) })} aria-label={`Tirar ${w}`}>{w} ✕</button>)}</div>
+            {s.words.length < 3 && <form onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('w') as HTMLInputElement; const v = f.value.trim().toLowerCase(); if (v && !s.words.includes(v)) set({ words: [...s.words, v] }); f.value = '' }}>
+              <input name="w" className="input" placeholder={['coragem', 'constância', 'leveza'][s.words.length]} maxLength={30} aria-label="Palavra do ciclo" /></form>}
+            {cycles.some((c) => c.id !== s.newCycleId && c.words.length) && <>
+              <span className="mono muted">Ciclos anteriores</span>
+              <div className="card flush list">{cycles.filter((c) => c.id !== s.newCycleId && c.words.length).slice(0, 4).map((c) => <div key={c.id} className="list-row"><span className="mono muted" style={{ width: 80 }}>{c.name}</span><span>{c.words.join(' · ')}</span></div>)}</div>
+            </>}
+            <span className="serif" style={{ fontSize: 28, marginTop: 12 }}>Who is she?</span>
+            <p className="muted" style={{ margin: 0 }}>Como você quer se ver no fim do ciclo. Frases curtas, no presente.</p>
+            <ListInput label="Who is she" items={s.who} onChange={(v) => set({ who: v })} placeholder="Ela…" max={20} />
           </div>
         )}
 
-        {id === 'financas' && <FinStep s={s} set={set} />}
+        {id === 'metas' && (cur ? <MetasArea key={cur.id} area={cur} vision={s.vision[cur.id] ?? ''} s={s} set={set} />
+          : <Empty>Escolha as áreas de foco primeiro.</Empty>)}
 
-        {id === 'recursos' && (
+        {id === 'datas' && <Datas from={nextStart} to={nextEnd} weeks={nextWeeks} />}
+
+        {id === 'ideias' && (
           <div className="stack">
-            <span className="mono muted">Sistemas e recursos</span>
-            <h1 className="serif-title">O que vai te apoiar neste ciclo?</h1>
-            <span className="mono muted">Cursos e livros</span>
-            <div className="card flush list">
-              {s.courses.map((c, i) => (
-                <div key={i} className="list-row"><div className="grow stack" style={{ gap: 0 }}><span>{c.t}</span><span className="caption muted">{[c.size, c.pace].filter(Boolean).join(' · ')}</span></div>
-                  <button className="faint" aria-label={`Tirar ${c.t}`} onClick={() => set({ courses: s.courses.filter((_, j) => j !== i) })}><Icon name="x" size={14} /></button></div>
-              ))}
-              <form className="list-row" style={{ flexWrap: 'wrap', rowGap: 8 }} onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const g = (n: string) => (f.elements.namedItem(n) as HTMLInputElement).value.trim(); if (!g('t')) return; set({ courses: [...s.courses, { t: g('t'), size: g('s'), pace: g('p') }] }); f.reset() }}>
-                <Icon name="plus" size={16} className="faint" />
-                <input name="t" className="input bare grow" style={{ minWidth: 160 }} placeholder="Curso ou livro" maxLength={120} aria-label="Curso ou livro" />
-                <input name="s" className="input bare" style={{ width: 100 }} placeholder="6 módulos" maxLength={40} aria-label="Tamanho" />
-                <input name="p" className="input bare" style={{ width: 110 }} placeholder="2 por mês" maxLength={40} aria-label="Ritmo" />
-                <button className="btn secondary small">Adicionar</button>
-              </form>
-            </div>
-            <span className="mono muted">Sistemas</span>
-            <label className="field"><span>Aqui no app</span><input className="input" value={s.sysIn} maxLength={200} onChange={(e) => set({ sysIn: e.target.value })} /></label>
-            <label className="field"><span>Fora do app</span><input className="input" value={s.sysOut} maxLength={200} placeholder="Obsidian para anotações, Strava, Clue" onChange={(e) => set({ sysOut: e.target.value })} /></label>
+            <h1 className="serif-title">Ideias para o ciclo</h1>
+            <p className="muted" style={{ margin: 0 }}>Eventos para pensar em ir, coisas legais para fazer, comprinhas. É a sua lista de prêmios: quando uma semana fechar com 85% ou mais, o app sugere uma delas.</p>
+            <ListInput label="Ideias" items={s.ideas} onChange={(v) => set({ ideas: v })} max={60} placeholder="Ex.: run club, aula de cerâmica, feira ecológica" />
           </div>
         )}
 
-        {id === 'foco' && (
-          <div className="stack">
-            <span className="mono muted">Semana de foco</span>
-            <h1 className="serif-title">Liste tudo o que precisa fazer em cada área no próximo mês.</h1>
-            <p className="muted" style={{ margin: 0 }}>Escreva solto. A frequência vira dado sozinha (ex.: “caminhar 2x por semana”, “journal diário”).</p>
-            <ListInput label="Semana de foco" items={s.focusWeek} onChange={(v) => set({ focusWeek: v })} max={40} placeholder="Ex.: conversar com a vó por chamada 1x por semana" />
-            {s.focusWeek.some((x) => parseFreq(x)) && (
-              <div className="card flush list">
-                {s.focusWeek.map((x, i) => { const f = parseFreq(x); return f ? <div key={i} className="list-row"><span className="grow">{x}</span><span className="pill caption">↻ {f}</span></div> : null })}
-              </div>
-            )}
-            <p className="caption muted" style={{ margin: 0 }}>Ao começar o ciclo, o que tem frequência por dia ou por semana vira hábito. O resto vira tarefa no Inbox.</p>
-          </div>
-        )}
+        {id === 'distribuir' && <Distribuir s={s} set={set} areas={areas} items={itemsWeek} weeks={nextWeeks} start={nextStart} busy={busy} onFinish={finish} reflected={s.reflect.filter(filled).length} />}
 
-        {id === 'resumo' && (
-          <div className="stack">
-            <span className="mono muted">{newCycle ? `Ciclo ${newCycle.name} · ${fmt(fromYmd(newCycle.starts_on), 'd MMM')} a ${fmt(addDays(fromYmd(newCycle.starts_on), execWeeks(newCycle) * 7 - 1), 'd MMM')} · ${execWeeks(newCycle)} semanas` : 'Resumo'}</span>
-            {s.who.length > 0 && <p className="serif-title" style={{ fontSize: 30 }}>“{s.who.slice(0, 3).map((x) => x.replace(/[.;]+$/, '')).join('. ')}.”</p>}
-            <div className="card flush list">
-              {[
-                ['Metas', `${newGoals.length}${newGoals.length ? ' · ' + [...new Set(newGoals.map((g) => areas.find((a) => a.id === g.area_id)?.name).filter(Boolean))].join(', ') : ''}`],
-                ['Passos', `${newSteps.length} nas ${nextWeeks} semanas`],
-                ['Hábitos novos', String(s.focusWeek.filter((x) => { const f = parseFreq(x); return f && habitDays(f) && !/por dia/.test(f) }).length)],
-                ['Datas', `${s.dates.length} marcadas`],
-                ['Recompensas', String(s.rewards.length)],
-                ['O que fica de fora', String(s.no.length)],
-                ['Ritual de domingo', 'planejar a semana no app'],
-              ].map(([k, v]) => <div key={k} className="list-row"><span className="grow">{k}</span><span className="medium">{v}</span></div>)}
-            </div>
-            <button className="btn primary block" onClick={finish}>Começar o ciclo</button>
-          </div>
-        )}
-
-        {!id.startsWith('pausa') && id !== 'resumo' && (
+        {id !== 'distribuir' && (
           <div className="row between" style={{ marginTop: 8 }}>
-            {s.step > 0 ? <button className="btn secondary" onClick={() => go(s.step - 1)}>Voltar</button> : <span />}
-            <button className="btn primary" onClick={async () => {
-              if (id === 'notas') { /* notas já foram salvas nas áreas */ }
-              if (id === 'melhorias') for (const a of areas) { const l = s.improve[a.id]; if (l?.length) await update<Area>('areas', a.id, { improve: l.join('. ').slice(0, 2000) }) }
-              if (id === 'prioridade') for (const a of areas.filter((x) => !x.is_fixed)) if (a.focus !== s.focus.includes(a.id)) await update<Area>('areas', a.id, { focus: s.focus.includes(a.id) })
-              if (id === 'visao' && newCycle) await update<Cycle>('cycles', newCycle.id, { words: s.words })
-              if (id === 'q9' && newCycle) await update<Cycle>('cycles', newCycle.id, { who_is_she: s.who.slice(0, 20) })
+            {s.step > 0 ? <button className="btn secondary" onClick={back}>Voltar</button> : <span />}
+            <button className="btn primary" onClick={() => {
+              if (id === 'inicio' && !s.reflect.length) { set({ reflect: areas.map((a) => a.id), step: 1, sub: 0 }); window.scrollTo({ top: 0 }); return }
+              if (id === 'foco') set({ focus: s.focus.filter((k) => s.reflect.includes(k)) })
               next()
-            }}>{id === 'inicio' ? 'Começar' : 'Continuar'}</button>
-          </div>
-        )}
-        {id.startsWith('pausa') && (
-          <div className="row between" style={{ marginTop: 8 }}>
-            <Link className="btn secondary" to="/ciclo">Continuar depois</Link>
-            <button className="btn primary" onClick={next}>Continuar agora</button>
+            }}>{id === 'inicio' ? 'Começar' : id === 'reflexao' && s.sub < subList.length - 1 ? `Próxima área: ${subList[s.sub + 1].name}` : id === 'metas' && s.sub < subList.length - 1 ? `Próxima área: ${subList[s.sub + 1].name}` : 'Continuar'}</button>
           </div>
         )}
       </section>
@@ -495,164 +282,337 @@ export function Trimestre() {
   )
 }
 
-// ---------------------------------------------------------------- partes
-function Pause({ n, title, text, facts }: { n: number; title: string; text: string; facts: [string, string][] }) {
-  return (
-    <div className="stack" style={{ alignItems: 'flex-start' }}>
-      <span className="mono muted">Parte {n} de 3 · concluída</span>
-      <div className="win-badge" style={{ width: 96, height: 96 }}><span className="big" style={{ fontSize: 34 }}>{n}/3</span></div>
-      <h1 className="serif-title">{title}</h1>
-      <p className="muted" style={{ margin: 0 }}>{text}</p>
-      <div className="card flush list" style={{ alignSelf: 'stretch' }}>{facts.map(([k, v]) => <div key={k} className="list-row"><span className="grow muted">{k}</span><span className="medium">{v}</span></div>)}</div>
-      <span className="caption faint">O app guarda onde você parou. Dá para continuar amanhã.</span>
-    </div>
-  )
+/** Semana proposta para cada projeto e tarefa sem semana: espalha os de cada área pelo ciclo. Eventos ficam na semana da data. */
+function proposeWeeks(items: Item[], weeks: number): Item[] {
+  const byArea: Record<string, Item[]> = {}
+  for (const it of items) if ((it.type === 'projeto' || it.type === 'tarefa') && !it.week) (byArea[it.area] ??= []).push(it)
+  const auto: Record<string, number> = {}
+  for (const list of Object.values(byArea)) list.forEach((it, i) => { auto[it.id] = Math.min(weeks, 1 + Math.floor((i * weeks) / list.length)) })
+  return items.map((it) => (auto[it.id] ? { ...it, week: auto[it.id] } : it))
 }
 
-function People({ s, set }: { s: RT; set: (p: Partial<RT>) => void }) {
-  const [show, setShow] = useState(false)
-  const chips = (items: string[], key: 'peoplePos' | 'peopleNeg') => (
-    <div className="chips">
-      {items.map((p) => <span key={p} className="chip on">{p}<button aria-label={`Tirar ${p}`} onClick={() => set({ [key]: items.filter((x) => x !== p) })}><Icon name="x" size={12} /></button></span>)}
-      <form onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('p') as HTMLInputElement; const v = f.value.trim(); if (v && !items.includes(v)) set({ [key]: [...items, v] }); f.value = '' }}>
-        <input name="p" className="input" style={{ width: 160, minHeight: 34 }} placeholder="+ nome" maxLength={40} aria-label="Pessoa" /></form>
-    </div>
-  )
-  return (
-    <>
-      <span className="mono muted">De forma positiva</span>{chips(s.peoplePos, 'peoplePos')}
-      <div className="row between"><span className="mono muted">De forma negativa</span><span className="caption muted">só você vê</span></div>
-      {show ? chips(s.peopleNeg, 'peopleNeg') : <button className="card soft caption" style={{ textAlign: 'left' }} onClick={() => setShow(true)}>{s.peopleNeg.length ? `${s.peopleNeg.length} pessoa${s.peopleNeg.length === 1 ? '' : 's'} · toque para ver` : 'Toque para escrever'}</button>}
-    </>
-  )
-}
-
-function Notas({ areas, s, set }: { areas: Area[]; s: RT; set: (p: Partial<RT>) => void }) {
-  const [open, setOpen] = useState<string | null>(null)
-  const fmtN = (v: number | null) => (v == null ? '–' : String(Number(v)).replace('.', ','))
+// ---------------------------------------------------------------- etapas
+function AreasPick({ areas, s, set }: { areas: Area[]; s: RT; set: (p: Partial<RT>) => void }) {
+  const [busy, setBusy] = useState('')
+  const known = new Set(AREA_CATALOG.map((p) => presetArea(p, areas)?.id).filter(Boolean))
+  const mine = areas.filter((a) => !known.has(a.id))
+  const toggle = (a: Area) => set({ reflect: s.reflect.includes(a.id) ? s.reflect.filter((x) => x !== a.id) : [...s.reflect, a.id] })
+  const create = async (key: string) => {
+    const p = AREA_CATALOG.find((x) => x.key === key)!
+    setBusy(key)
+    try {
+      const a = await insert<Area>('areas', { name: p.name, color: p.color, icon: p.icon, position: Math.max(0, ...areas.map((x) => x.position)) + 1, is_fixed: false, focus: false, archived: false })
+      set({ reflect: [...s.reflect, a.id], created: [...s.created, a.id] })
+    } catch { /* fica sem marcar */ }
+    setBusy('')
+  }
+  const card = (a: Area | null, p: { key: string; name: string; color: Area['color']; icon: string; hint?: string }) => {
+    const on = !!a && s.reflect.includes(a.id)
+    return (
+      <button key={a?.id ?? p.key} className={'area-card' + (on ? ' on' : '')} aria-pressed={on} disabled={busy === p.key}
+        style={on ? { background: `var(--${p.color}-bg)`, color: `var(--${p.color}-fg)` } : undefined}
+        onClick={() => (a ? toggle(a) : create(p.key))}>
+        <div className="row between"><AreaIcon area={{ color: p.color, icon: p.icon }} size={30} />{on && <Icon name="check" size={16} />}</div>
+        <span className="medium">{p.name}</span>
+        {p.hint && <span className="caption" style={{ opacity: 0.8 }}>{p.hint}</span>}
+      </button>
+    )
+  }
   return (
     <div className="stack">
-      <span className="mono muted">Áreas da vida</span>
-      <h1 className="serif-title">De 0 a 10, como está cada área hoje? E onde você quer chegar?</h1>
-      <div className="card flush list">
+      <h1 className="serif-title">Quais áreas você quer olhar neste ritual?</h1>
+      <p className="muted" style={{ margin: 0 }}>Escolha quantas fizerem sentido. Em cada uma você vai dar uma nota e pensar no que funcionou, no que não funcionou e no que melhorar.</p>
+      <div className="area-pick">
+        {mine.map((a) => card(a, { ...a, key: a.id }))}
+        {AREA_CATALOG.map((p) => { const a = presetArea(p, areas); return card(a ?? null, a ? { ...p, name: a.name, color: a.color, icon: a.icon } : p) })}
+      </div>
+      <span className="caption muted">{s.reflect.length} área{s.reflect.length === 1 ? '' : 's'} para refletir</span>
+    </div>
+  )
+}
+
+function PairList({ items, onChange, max, a, b, label }: { items: { t: string; x: string }[]; onChange: (v: { t: string; x: string }[]) => void; max: number; a: string; b: string; label: string }) {
+  const [t, setT] = useState(''); const [x, setX] = useState('')
+  const add = () => { if (!t.trim() || items.length >= max) return; onChange([...items, { t: t.trim(), x: x.trim() }]); setT(''); setX('') }
+  return (
+    <div className="card flush list" aria-label={label}>
+      {items.map((it, i) => (
+        <div key={`${i}-${it.t}-${it.x}`} className="list-row pair-row">
+          <span className="li-dot" aria-hidden />
+          <div className="grow stack" style={{ gap: 2 }}>
+            <input className="input bare" defaultValue={it.t} maxLength={200} aria-label={`${label} ${i + 1}`} onBlur={(e) => { const v = e.target.value.trim(); const n = [...items]; if (v) n[i] = { ...it, t: v }; else n.splice(i, 1); onChange(n) }} />
+            <input className="input bare caption muted" defaultValue={it.x} maxLength={300} placeholder={b} aria-label={`${b} ${i + 1}`} onBlur={(e) => { const n = [...items]; n[i] = { ...it, x: e.target.value.trim() }; onChange(n) }} />
+          </div>
+          <button className="faint" aria-label="Tirar" onClick={() => onChange(items.filter((_, j) => j !== i))}><Icon name="x" size={14} /></button>
+        </div>
+      ))}
+      {items.length < max && (
+        <form className="list-row pair-row" onSubmit={(e) => { e.preventDefault(); add() }}>
+          <Icon name="plus" size={16} className="faint" />
+          <div className="grow stack" style={{ gap: 2 }}>
+            <input className="input bare" value={t} maxLength={200} placeholder={a} onChange={(e) => setT(e.target.value)} aria-label={`Nova linha: ${label}`} />
+            {t.trim() && <input className="input bare caption" value={x} maxLength={300} placeholder={b} onChange={(e) => setX(e.target.value)} onBlur={add} aria-label={b} />}
+          </div>
+          {t.trim() && <button className="btn secondary small">Adicionar</button>}
+        </form>
+      )}
+    </div>
+  )
+}
+
+function Reflect({ area, r, onChange }: { area: Area; r: AreaRefl; onChange: (r: AreaRefl) => void }) {
+  const set = (p: Partial<AreaRefl>) => onChange({ ...r, ...p })
+  return (
+    <div className="stack">
+      <div className="row" style={{ gap: 12 }}><AreaIcon area={area} size={40} /><h1 className="serif-title" style={{ margin: 0 }}>{area.name}</h1></div>
+      <span className="mono muted">Nota de 1 a 10 no último ciclo{area.score_now != null ? ` · antes: ${Number(area.score_now)}` : ''}</span>
+      <div className="nota-row" role="radiogroup" aria-label={`Nota de ${area.name}`}>
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={r.score === n} className={'nota mono' + (r.score === n ? ' on' : '')} onClick={() => set({ score: r.score === n ? null : n })}>{n}</button>
+        ))}
+      </div>
+      <span className="mono muted">O que funcionou, e como · até 4</span>
+      <PairList label="O que funcionou" max={4} a="Ex.: caminhar de manhã" b="Como? Ex.: deixava o tênis na porta"
+        items={r.good.map((g) => ({ t: g.t, x: g.how }))} onChange={(v) => set({ good: v.map((g) => ({ t: g.t, how: g.x })) })} />
+      <span className="mono muted">O que não funcionou, e por quê</span>
+      <PairList label="O que não funcionou" max={12} a="Ex.: estudar à noite" b="Por quê? Ex.: chegava cansada"
+        items={r.bad.map((g) => ({ t: g.t, x: g.why }))} onChange={(v) => set({ bad: v.map((g) => ({ t: g.t, why: g.x })) })} />
+      <span className="mono muted">Melhorias para o próximo ciclo</span>
+      <ListInput label={`Melhorias em ${area.name}`} items={r.improve} max={10} placeholder="Ex.: estudar de manhã, antes do trabalho" onChange={(v) => set({ improve: v })} />
+      <span className="caption muted">Pode deixar em branco o que não fizer sentido.</span>
+    </div>
+  )
+}
+
+function Foco({ areas, s, set }: { areas: Area[]; s: RT; set: (p: Partial<RT>) => void }) {
+  const n = s.focus.length
+  return (
+    <div className="stack">
+      <h1 className="serif-title">Em quais áreas você vai focar neste ciclo?</h1>
+      <p className="muted" style={{ margin: 0 }}>A recomendação é até 4. As outras continuam no app, guardadas em “Outras áreas”, sem metas neste ciclo.</p>
+      <div className="area-pick">
         {areas.map((a) => {
-          const n = s.notes[a.id] ?? { why: '', how: '' }
-          const setN = (p: Partial<typeof n>) => set({ notes: { ...s.notes, [a.id]: { ...n, ...p } } })
-          return (
-            <div key={a.id} className="stack notas-row">
-              <button className="row" style={{ gap: 10, width: '100%' }} onClick={() => setOpen(open === a.id ? null : a.id)} aria-expanded={open === a.id}>
-                <AreaIcon area={a} size={28} /><span className="grow medium" style={{ textAlign: 'left' }}>{a.name}</span>
-                <span className="mono">{fmtN(a.score_now)} → {fmtN(a.score_goal)}</span><Icon name="chevron" size={14} />
-              </button>
-              <div className="grid2" style={{ gap: 12 }}>
-                <label className="stack" style={{ gap: 2 }}><span className="caption muted">hoje · {fmtN(a.score_now)}</span>
-                  <input type="range" min={0} max={10} step={0.5} defaultValue={a.score_now ?? 5} onPointerUp={(e) => update<Area>('areas', a.id, { score_now: Number(e.currentTarget.value) })} onKeyUp={(e) => update<Area>('areas', a.id, { score_now: Number(e.currentTarget.value) })} aria-label={`${a.name} hoje`} /></label>
-                <label className="stack" style={{ gap: 2 }}><span className="caption muted">onde quero chegar · {fmtN(a.score_goal)}</span>
-                  <input type="range" min={0} max={10} step={0.5} defaultValue={a.score_goal ?? 8} onPointerUp={(e) => update<Area>('areas', a.id, { score_goal: Number(e.currentTarget.value) })} onKeyUp={(e) => update<Area>('areas', a.id, { score_goal: Number(e.currentTarget.value) })} aria-label={`${a.name} onde quero chegar`} /></label>
-              </div>
-              {open === a.id && (
-                <div className="grid2" style={{ gap: 12 }}>
-                  <label className="field"><span>Por quê? (hoje)</span><textarea className="input" rows={2} maxLength={500} value={n.why} onChange={(e) => setN({ why: e.target.value })} /></label>
-                  <label className="field"><span>Como? (quero)</span><textarea className="input" rows={2} maxLength={500} value={n.how} onChange={(e) => setN({ how: e.target.value })} /></label>
-                </div>
-              )}
-            </div>
-          )
+          const on = s.focus.includes(a.id); const r = s.refl[a.id]
+          return <button key={a.id} className={'area-card' + (on ? ' on' : '')} aria-pressed={on}
+            style={on ? { background: `var(--${a.color}-bg)`, color: `var(--${a.color}-fg)` } : undefined}
+            onClick={() => set({ focus: on ? s.focus.filter((x) => x !== a.id) : [...s.focus, a.id] })}>
+            <div className="row between"><AreaIcon area={a} size={30} />{on ? <Icon name="check" size={16} /> : r?.score != null && <span className="mono caption">{r.score}/10</span>}</div>
+            <span className="medium">{a.name}</span>
+            {r?.improve[0] && <span className="caption" style={{ opacity: 0.8 }}>{r.improve[0]}</span>}
+          </button>
         })}
       </div>
-      <span className="caption muted">Toque numa área para escrever o porquê da nota e como chegar lá.</span>
+      <span className="caption muted">{n} escolhida{n === 1 ? '' : 's'}</span>
+      {n > 4 && <div className="card soft caption"><b>São {n} áreas.</b> No 12 Week Year, mais de 4 focos costuma virar ruído: a atenção se espalha e as coisas pequenas de cada semana ficam para trás. Se puder, deixe só as que mais importam agora.</div>}
+      {s.focus.map((k) => areas.find((a) => a.id === k)).filter((a): a is Area => !!a).map((a) => (
+        <label key={a.id} className="field">
+          <span className="row" style={{ gap: 8 }}><AreaIcon area={a} size={22} />{a.name}: no fim do ciclo eu quero TER…</span>
+          <textarea className="input" rows={2} maxLength={500} value={s.vision[a.id] ?? ''} placeholder={VISION_HINTS[a.color] ?? 'Ex.: feito aquilo que eu adio há meses'}
+            onChange={(e) => set({ vision: { ...s.vision, [a.id]: e.target.value } })} />
+        </label>
+      ))}
+    </div>
+  )
+}
+const VISION_HINTS: Partial<Record<Area['color'], string>> = {
+  trabalho: 'Ex.: encontrado um emprego que eu amo', relacoes: 'Ex.: amigos em quem eu confio de verdade', saude: 'Ex.: conseguido ficar menos ansiosa falando com pessoas',
+  estudos: 'Ex.: enviado todas as candidaturas do mestrado', financas: 'Ex.: uma reserva de 3 meses guardada', eu: 'Ex.: um hobby que é só meu',
+}
+
+function Tipos() {
+  const cards: [string, string, string, string][] = [
+    ['Hábito', 'repeat', 'Algo que se repete. O resultado vem da constância, não de uma entrega.', 'Caminhar 3x por semana · journal diário · ligar para a vó todo domingo'],
+    ['Projeto', 'target', 'Tem começo e fim. É uma sequência de passos que termina numa entrega.', 'Montar o portfólio · enviar a candidatura do mestrado · organizar a viagem'],
+    ['Mix', 'growth', 'Um projeto que depende de um hábito para acontecer.', 'Correr 10 km: treinar 3x por semana (hábito) e se inscrever na prova (projeto)'],
+  ]
+  return (
+    <div className="stack">
+      <h1 className="serif-title">Hábito, projeto ou os dois?</h1>
+      <p className="muted" style={{ margin: 0 }}>Antes das metas, uma diferença que ajuda a planejar. Cada meta vai ganhar uma destas etiquetas.</p>
+      {cards.map(([t, ic, d, ex]) => (
+        <div key={t} className="card stack" style={{ gap: 6 }}>
+          <span className="row" style={{ gap: 8 }}><span className="owner-ico"><Icon name={ic} size={16} /></span><span className="serif" style={{ fontSize: 26 }}>{t}</span></span>
+          <span>{d}</span>
+          <span className="caption muted">{ex}</span>
+        </div>
+      ))}
+      <div className="card soft caption">O caminho completo: o que você quer <b>TER</b> é a visão da área; as <b>metas</b> são os resultados que levam até lá; <b>projetos e hábitos</b> são o que você faz para chegar nas metas; as <b>tarefas</b> são os passos de cada semana.</div>
     </div>
   )
 }
 
-function Metas({ s, weeks, areas, newCycle, goals, steps, ensureCycle }: { s: RT; weeks: number; areas: Area[]; newCycle?: Cycle; goals: Goal[]; steps: Step[]; ensureCycle: () => Promise<Cycle> }) {
-  const [open, setOpen] = useState(false)
-  const [cid, setCid] = useState<string | null>(null)
-  const KIND = { project: 'Projeto', habit: 'Hábito', both: 'Projeto + hábito' }
-  const insp = [...s.focus, ...Object.keys(s.improve)].flatMap((k) => s.improve[k] ?? []).filter((v, i, a) => a.indexOf(v) === i)
+function MetasArea({ area, vision, s, set }: { area: Area; vision: string; s: RT; set: (p: Partial<RT>) => void }) {
+  const metas = s.metas.filter((m) => m.area === area.id)
+  const items = s.items.filter((i) => i.area === area.id)
+  const setMeta = (id: string, p: Partial<Meta>) => set({ metas: s.metas.map((m) => (m.id === id ? { ...m, ...p } : m)) })
+  const setItem = (id: string, p: Partial<Item>) => set({ items: s.items.map((i) => (i.id === id ? { ...i, ...p } : i)) })
+  const [t, setT] = useState(''); const [type, setType] = useState<ItemType>('projeto')
+  const [mt, setMt] = useState('')
+  const addMeta = () => { if (!mt.trim()) return; set({ metas: [...s.metas, { id: uid(), area: area.id, t: mt.trim(), kind: 'project', done: '' }] }); setMt('') }
+  const addItem = () => { if (!t.trim()) return; set({ items: [...s.items, { id: uid(), area: area.id, meta: metas[metas.length - 1]?.id ?? null, t: t.trim(), type, days: type === 'habito' ? [1, 3, 5] : undefined }] }); setT('') }
   return (
     <div className="stack">
-      <span className="mono muted">Metas</span>
-      <h1 className="serif-title">No fim do {newCycle?.name ?? 'ciclo'}, eu preciso TER…</h1>
-      <p className="muted" style={{ margin: 0 }}>Cada meta tem um “pronto” claro e um tipo: hábito, projeto ou os dois.</p>
-      {goals.length ? (
+      <div className="row" style={{ gap: 12 }}><AreaIcon area={area} size={40} /><h1 className="serif-title" style={{ margin: 0 }}>{area.name}</h1></div>
+      {vision.trim() && <p className="serif" style={{ fontSize: 22, lineHeight: '28px', margin: 0 }}>“Quero ter {vision.trim().replace(/^quero ter\s*/i, '').replace(/[.]+$/, '')}.”</p>}
+
+      <span className="mono muted">Metas principais</span>
+      {metas.map((m) => (
+        <div key={m.id} className="card stack" style={{ gap: 8 }}>
+          <div className="row" style={{ gap: 8 }}>
+            <input className="input bare grow medium" defaultValue={m.t} maxLength={200} aria-label="Meta" onBlur={(e) => setMeta(m.id, { t: e.target.value })} />
+            <button className="faint" aria-label={`Tirar ${m.t}`} onClick={() => set({ metas: s.metas.filter((x) => x.id !== m.id), items: s.items.map((i) => (i.meta === m.id ? { ...i, meta: null } : i)) })}><Icon name="x" size={14} /></button>
+          </div>
+          <div className="dur-options" role="radiogroup" aria-label="Tipo da meta">
+            {(['habit', 'project', 'both'] as Kind[]).map((k) => <button key={k} type="button" role="radio" aria-checked={m.kind === k} className={'dur-opt small' + (m.kind === k ? ' on' : '')} onClick={() => setMeta(m.id, { kind: k })}>{KIND_NAME[k]}</button>)}
+          </div>
+          <input className="input" defaultValue={m.done} maxLength={500} placeholder="Está pronta quando… (ex.: 3 candidaturas enviadas)" aria-label="Quando a meta está pronta" onBlur={(e) => setMeta(m.id, { done: e.target.value })} />
+        </div>
+      ))}
+      <form className="card row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); addMeta() }}>
+        <Icon name="plus" size={16} className="faint" />
+        <input className="input bare grow" value={mt} maxLength={200} placeholder="Nova meta (o resultado final)" onChange={(e) => setMt(e.target.value)} aria-label="Nova meta" />
+        {mt.trim() && <button className="btn secondary small">Adicionar</button>}
+      </form>
+      {metas.length > 3 && <span className="caption muted">Mais de 3 metas numa área costuma ser muito para um ciclo.</span>}
+
+      <span className="mono muted" style={{ marginTop: 8 }}>Projetos, hábitos e o que fazer</span>
+      <p className="caption muted" style={{ margin: 0 }}>Cada item ganha um tipo agora. No fim do ritual o app propõe em que semana cada um entra.</p>
+      {items.length > 0 && (
         <div className="card flush list">
-          {goals.map((g) => (
-            <div key={g.id} className="list-row">
-              <div className="grow stack" style={{ gap: 2 }}><span className="mono muted">{KIND[g.kind]}</span><span className="medium">{g.title}</span>{g.done_definition && <span className="caption muted">{g.done_definition}</span>}</div>
-              <AreaTag area={areas.find((a) => a.id === g.area_id)} />
+          {items.map((it) => (
+            <div key={it.id} className="list-row" style={{ flexWrap: 'wrap', rowGap: 8 }}>
+              <span className="tag-pill">{TYPE_NAME[it.type]}</span>
+              <input className="input bare grow" style={{ minWidth: 160 }} defaultValue={it.t} maxLength={200} aria-label="Item" onBlur={(e) => setItem(it.id, { t: e.target.value })} />
+              <select className="input" style={{ width: 'auto' }} value={it.type} aria-label="Tipo" onChange={(e) => { const v = e.target.value as ItemType; setItem(it.id, { type: v, days: v === 'habito' ? it.days ?? [1, 3, 5] : it.days }) }}>
+                {(Object.keys(TYPE_NAME) as ItemType[]).map((k) => <option key={k} value={k}>{TYPE_NAME[k]}</option>)}
+              </select>
+              {metas.length > 0 && <select className="input" style={{ width: 'auto', maxWidth: 200 }} value={it.meta ?? ''} aria-label="Meta" onChange={(e) => setItem(it.id, { meta: e.target.value || null })}>
+                <option value="">sem meta</option>{metas.map((m) => <option key={m.id} value={m.id}>{m.t}</option>)}
+              </select>}
+              {it.type === 'habito' && <div className="row" style={{ gap: 4, width: '100%' }} role="group" aria-label="Dias">
+                {DAYS.map((d, i) => { const on = it.days?.includes(i); return <button key={i} type="button" aria-pressed={on} className={'nota small mono' + (on ? ' on' : '')} onClick={() => setItem(it.id, { days: on ? (it.days ?? []).filter((x) => x !== i) : [...(it.days ?? []), i].sort() })}>{d}</button> })}
+              </div>}
+              {it.type === 'evento' && <input type="date" className="input" style={{ width: 170 }} value={it.date ?? ''} aria-label="Dia do evento" onChange={(e) => setItem(it.id, { date: e.target.value || undefined })} />}
+              {it.type === 'projeto' && !it.meta && <span className="caption muted" style={{ width: '100%' }}>Sem meta, este projeto entra como tarefa.</span>}
+              <button className="faint" aria-label={`Tirar ${it.t}`} onClick={() => set({ items: s.items.filter((x) => x.id !== it.id) })}><Icon name="x" size={14} /></button>
             </div>
           ))}
         </div>
-      ) : <Empty>Nenhuma meta ainda.</Empty>}
-      <button className="btn secondary" disabled={goals.length >= 5} onClick={async () => { const c = await ensureCycle(); setCid(c.id); setOpen(true) }}><Icon name="plus" size={16} />Criar meta (abre o passo a passo)</button>
-      <span className="caption muted">Recomendado: até 3 metas por ciclo.</span>
-      {open && cid && <GoalWizard cycleId={cid} weeks={weeks} areas={areas} existing={steps} position={goals.length} index={goals.length} inspiration={insp} areaId={s.focus[goals.length]}
-        onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />}
-    </div>
-  )
-}
-
-function Datas({ s, set, cycle, ensureCycle }: { s: RT; set: (p: Partial<RT>) => void; cycle?: Cycle; ensureCycle: () => Promise<Cycle> }) {
-  const from = cycle?.starts_on ?? todayYmd()
-  const to = cycle?.ends_on ?? ymd(addDays(new Date(), 91))
-  const { rows: events } = useRows<CalEvent>('events', { gte: { starts_at: toIso(from) }, lt: { starts_at: toIso(to) }, order: { column: 'starts_at' } })
-  const kindOf = (e: CalEvent) => /anivers/i.test(e.title) ? 'aniversário' : /feriado/i.test(e.title) ? 'feriado' : /viagem|f[eé]rias|pausa/i.test(e.title) ? 'viagem' : e.all_day ? 'evento' : 'compromisso'
-  const big = events.filter((e) => e.all_day || new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime() >= 3 * 3600e3 || /anivers|feriado|viagem|entrevista|apresenta/i.test(e.title))
-  const fromG = big.filter((e) => e.external_id?.startsWith('gcal:')).length
-  const span = (e: CalEvent) => { const a = new Date(e.starts_at), b = new Date(new Date(e.ends_at).getTime() - (e.all_day ? 1 : 0)); return a.toDateString() === b.toDateString() ? fmt(a, 'd') : `${fmt(a, 'd')}–${fmt(b, 'd')}` }
-  return (
-    <div className="stack">
-      <span className="mono muted">Plano do trimestre</span>
-      <h1 className="serif-title">Eventos, feriados, viagens e aniversários</h1>
-      <p className="muted" style={{ margin: 0 }}>{fromG ? `${fromG} datas vieram do Google Calendar. ` : ''}Confira e marque o que importa.</p>
-      {big.length ? (
-        <div className="card flush list">
-          {big.map((e) => {
-            const on = s.dates.includes(e.id)
-            return (
-              <label key={e.id} className="list-row">
-                <div className="date-chip"><span className="mono">{fmt(new Date(e.starts_at), 'MMM').toUpperCase()}</span><span className="medium">{span(e)}</span></div>
-                <div className="grow stack" style={{ gap: 0 }}><span>{e.title}</span><span className="caption muted">{kindOf(e)}</span></div>
-                <input type="checkbox" checked={on} onChange={() => set({ dates: on ? s.dates.filter((x) => x !== e.id) : [...s.dates, e.id] })} aria-label={`Importa: ${e.title}`} />
-              </label>
-            )
-          })}
-        </div>
-      ) : <Empty>Nenhuma data grande no período do ciclo ainda.</Empty>}
-      <form className="card row" style={{ flexWrap: 'wrap', gap: 8 }} onSubmit={async (e) => { e.preventDefault(); const f = e.currentTarget; const t = (f.elements.namedItem('t') as HTMLInputElement).value.trim(); const d = (f.elements.namedItem('d') as HTMLInputElement).value; if (!t || !d) return
-        await ensureCycle(); const ev = await insert<CalEvent>('events', { title: t, starts_at: toIso(d), ends_at: toIso(ymd(addDays(fromYmd(d), 1))), all_day: true, kind: 'appointment', area_id: null, location: null, notes: null, reminder_minutes: null }); set({ dates: [...s.dates, ev.id] }); f.reset() }}>
+      )}
+      <form className="card row" style={{ gap: 8, flexWrap: 'wrap' }} onSubmit={(e) => { e.preventDefault(); addItem() }}>
         <Icon name="plus" size={16} className="faint" />
-        <input name="t" className="input grow" style={{ minWidth: 160 }} placeholder="Adicionar data (ex.: aniversário do pai)" maxLength={120} aria-label="Nova data" />
-        <input name="d" type="date" className="input" style={{ width: 160 }} aria-label="Dia" defaultValue={from} />
-        <button className="btn secondary small">Adicionar</button>
+        <input className="input bare grow" style={{ minWidth: 160 }} value={t} maxLength={200} placeholder="Ex.: atualizar o portfólio" onChange={(e) => setT(e.target.value)} aria-label="Novo projeto, hábito, tarefa ou evento" />
+        <select className="input" style={{ width: 'auto' }} value={type} aria-label="Tipo do item" onChange={(e) => setType(e.target.value as ItemType)}>
+          {(Object.keys(TYPE_NAME) as ItemType[]).map((k) => <option key={k} value={k}>{TYPE_NAME[k]}</option>)}
+        </select>
+        <button className="btn secondary small" disabled={!t.trim()}>Adicionar</button>
       </form>
     </div>
   )
 }
 
-function FinStep({ s, set }: { s: RT; set: (p: Partial<RT>) => void }) {
-  const { profile } = useAuth()
-  const cur = profile?.currency_main ?? 'EUR'
-  const { rows: incomes } = useRows<Income>('incomes')
-  const { rows: rules } = useRows<BudgetRule>('budget_rules')
-  const rule = rules[0] ?? DEFAULT_RULE
-  const monthly = inMonth(incomes, 'received_on', ym(new Date())).reduce((a, r) => a + r.amount_cents, 0)
-  const suggested = Math.round((monthly * rule.savings_pct) / 100) * 3
+function Datas({ from, to, weeks }: { from: string; to: string; weeks: number }) {
+  const { rows: events } = useRows<CalEvent>('events', { gte: { starts_at: toIso(from) }, lt: { starts_at: toIso(to) }, order: { column: 'starts_at' } })
+  const [kind, setKind] = useState('Evento')
+  const kindOf = (e: CalEvent) => /anivers/i.test(e.title) ? 'aniversário' : /feriado|dia d[aoe]s? |natal|carnaval|p[aá]scoa|ano novo|independ|rep[uú]blica|consci[eê]ncia|corpo de deus|finados|imaculada/i.test(e.title) ? 'feriado' : /viagem|f[eé]rias|voo|pausa/i.test(e.title) ? 'viagem' : e.all_day ? 'evento' : 'compromisso'
+  const big = events.filter((e) => e.all_day || new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime() >= 3 * 3600e3 || /anivers|feriado|viagem|entrevista|apresenta|prova|exame/i.test(e.title))
+  const weekOfDate = (d: Date) => Math.min(weeks + 1, Math.floor((d.getTime() - fromYmd(from).getTime()) / (7 * 86400e3)) + 1)
+  const months: { key: string; label: string; list: CalEvent[] }[] = []
+  for (let d = fromYmd(from); d <= fromYmd(to); d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    const key = fmt(d, 'yyyy-MM')
+    months.push({ key, label: fmt(d, "MMMM 'de' yyyy"), list: big.filter((e) => fmt(new Date(e.starts_at), 'yyyy-MM') === key) })
+  }
+  const span = (e: CalEvent) => { const a = new Date(e.starts_at), b = new Date(new Date(e.ends_at).getTime() - (e.all_day ? 1 : 0)); return a.toDateString() === b.toDateString() ? fmt(a, 'd') : `${fmt(a, 'd')}–${fmt(b, 'd')}` }
   return (
     <div className="stack">
-      <span className="mono muted">Plano do trimestre</span>
-      <h1 className="serif-title">Sua meta financeira do ciclo</h1>
-      <p className="muted" style={{ margin: 0 }}>Puxamos os números de Finanças. Ajuste se quiser.</p>
-      <div className="card flush list">
-        <div className="list-row"><span className="grow">Renda por mês</span><span className="medium">{money(monthly, cur)}</span></div>
-        <div className="list-row"><span className="grow">Economias pela sua regra ({rule.savings_pct}%)</span><span className="medium">{money(Math.round((monthly * rule.savings_pct) / 100), cur)} / mês</span></div>
-        <label className="list-row"><span className="grow">Guardar no ciclo (3 meses)</span>
-          <input className="input" style={{ width: 140 }} inputMode="decimal" value={s.financeGoal} placeholder={suggested ? (suggested / 100).toFixed(2).replace('.', ',') : '0,00'} onChange={(e) => set({ financeGoal: e.target.value })} /></label>
-        <label className="list-row"><span className="grow">Criar um pote com esta meta</span><input type="checkbox" checked={s.makePot} onChange={() => set({ makePot: !s.makePot })} /></label>
+      <h1 className="serif-title">O que acontece neste ciclo?</h1>
+      <p className="muted" style={{ margin: 0 }}>Eventos, feriados, viagens, aniversários e datas importantes, mês a mês. Vêm das agendas que você mostra no app (como os feriados que você assina no Google). Complete o que faltar para não esquecer nada.</p>
+      {months.map((m) => (
+        <div key={m.key} className="stack" style={{ gap: 6 }}>
+          <span className="mono muted">{m.label}</span>
+          {m.list.length ? (
+            <div className="card flush list">
+              {m.list.map((e) => (
+                <div key={e.id} className="list-row">
+                  <div className="date-chip"><span className="mono">{fmt(new Date(e.starts_at), 'EEE').toUpperCase()}</span><span className="medium">{span(e)}</span></div>
+                  <div className="grow stack" style={{ gap: 0 }}><span>{e.title}</span><span className="caption muted">{kindOf(e)} · semana {weekOfDate(new Date(e.starts_at))}</span></div>
+                </div>
+              ))}
+            </div>
+          ) : <span className="caption muted">Nada marcado ainda.</span>}
+        </div>
+      ))}
+      <form className="card row" style={{ flexWrap: 'wrap', gap: 8 }} onSubmit={async (e) => {
+        e.preventDefault(); const f = e.currentTarget; const t = (f.elements.namedItem('t') as HTMLInputElement).value.trim(); const d = (f.elements.namedItem('d') as HTMLInputElement).value; if (!t || !d) return
+        const title = kind === 'Aniversário' && !/anivers/i.test(t) ? `Aniversário: ${t}` : kind === 'Viagem' && !/viagem/i.test(t) ? `Viagem: ${t}` : t
+        await insert<CalEvent>('events', { title, starts_at: toIso(d), ends_at: toIso(ymd(addDays(fromYmd(d), 1))), all_day: true, kind: 'appointment', area_id: null, location: null, notes: null, reminder_minutes: null }); f.reset()
+      }}>
+        <Icon name="plus" size={16} className="faint" />
+        <select className="input" style={{ width: 'auto' }} value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Tipo da data">{['Evento', 'Aniversário', 'Viagem', 'Feriado'].map((k) => <option key={k}>{k}</option>)}</select>
+        <input name="t" className="input grow" style={{ minWidth: 160 }} placeholder={kind === 'Aniversário' ? 'De quem?' : 'O que é?'} maxLength={120} aria-label="Nova data" />
+        <input name="d" type="date" className="input" style={{ width: 160 }} aria-label="Dia" defaultValue={from} min={from} max={to} />
+        <button className="btn secondary small">Adicionar</button>
+      </form>
+      <span className="caption muted">Aniversários que se repetem todo ano: marque como “anual” na Agenda depois, se a sua agenda do Google ainda não tiver.</span>
+    </div>
+  )
+}
+
+function Distribuir({ s, set, areas, items, weeks, start, busy, onFinish, reflected }: { s: RT; set: (p: Partial<RT>) => void; areas: Area[]; items: Item[]; weeks: number; start: string; busy: boolean; onFinish: () => void; reflected: number }) {
+  const area = (k: string) => areas.find((a) => a.id === k)
+  const live = items.filter((i) => i.t.trim() && s.focus.includes(i.area))
+  const weekOfDate = (d: string) => Math.max(1, Math.min(weeks, Math.floor((fromYmd(d).getTime() - fromYmd(start).getTime()) / (7 * 86400e3)) + 1))
+  const habits = live.filter((i) => i.type === 'habito')
+  const dated = live.filter((i) => i.type !== 'habito')
+  const setWeek = (id: string, w: number) => set({ items: s.items.map((i) => (i.id === id ? { ...i, week: w } : i)) })
+  const typeOf = (i: Item) => (i.type === 'projeto' && !i.meta ? 'tarefa' : i.type === 'evento' && !i.date ? 'tarefa' : i.type)
+  const metas = s.metas.filter((m) => m.t.trim() && s.focus.includes(m.area))
+  return (
+    <div className="stack">
+      <h1 className="serif-title">Revisar e distribuir</h1>
+      <p className="muted" style={{ margin: 0 }}>O app separou o que é meta, projeto, hábito, tarefa e evento e propôs uma semana para cada coisa. Mude o que quiser e comece o ciclo.</p>
+      <div className="habit-stats">
+        <div className="card stack" style={{ gap: 0 }}><span className="big">{s.focus.length}</span><span className="caption muted">áreas de foco · {reflected} refletidas</span></div>
+        <div className="card stack" style={{ gap: 0 }}><span className="big">{metas.length}</span><span className="caption muted">metas</span></div>
+        <div className="card stack" style={{ gap: 0 }}><span className="big">{weeks}</span><span className="caption muted">semanas · de {fmt(fromYmd(start), 'd MMM')}</span></div>
       </div>
-      {!s.financeGoal && suggested > 0 && <button className="caption medium" style={{ alignSelf: 'flex-start' }} onClick={() => set({ financeGoal: (suggested / 100).toFixed(2).replace('.', ',') })}>Usar a sugestão: {money(suggested, cur)}</button>}
-      <div className="card soft row" style={{ gap: 8 }}><Icon name="lock" size={16} /><span className="caption"><b>Privado.</b> Valores financeiros nunca aparecem para o grupo, nem no modo “Tudo”.</span></div>
+      {metas.length > 0 && <>
+        <span className="mono muted">Metas</span>
+        <div className="card flush list">{metas.map((m) => <div key={m.id} className="list-row"><div className="grow stack" style={{ gap: 0 }}><span className="medium">{m.t}</span>{m.done && <span className="caption muted">pronta quando: {m.done}</span>}</div><span className="tag-pill">{KIND_NAME[m.kind]}</span><AreaTag area={area(m.area)} /></div>)}</div>
+      </>}
+      {habits.length > 0 && <>
+        <span className="mono muted">Hábitos · toda semana</span>
+        <div className="card flush list">{habits.map((h) => <div key={h.id} className="list-row"><span className="grow">{h.t}</span><span className="caption muted mono">{(h.days ?? []).map((d) => DAYS[d]).join(' ')}</span><AreaTag area={area(h.area)} /></div>)}</div>
+      </>}
+      {Array.from({ length: weeks }, (_, w) => w + 1).map((w) => {
+        const list = dated.filter((i) => (i.type === 'evento' && i.date ? weekOfDate(i.date) : i.week ?? 1) === w)
+        if (!list.length) return null
+        return (
+          <div key={w} className="stack" style={{ gap: 6 }}>
+            <span className="mono muted">Semana {w} · {fmt(addDays(fromYmd(start), (w - 1) * 7), 'd MMM')}</span>
+            <div className="card flush list">
+              {list.map((i) => (
+                <div key={i.id} className="list-row" style={{ flexWrap: 'wrap', rowGap: 6 }}>
+                  <span className="tag-pill">{TYPE_NAME[typeOf(i)]}</span>
+                  <span className="grow" style={{ minWidth: 140 }}>{i.t}</span>
+                  <AreaTag area={area(i.area)} />
+                  {i.type === 'evento' && i.date ? <span className="caption muted">{fmt(fromYmd(i.date), 'd MMM')}</span> : (
+                    <select className="input" style={{ width: 'auto' }} value={i.week ?? 1} aria-label={`Semana de ${i.t}`} onChange={(e) => setWeek(i.id, Number(e.target.value))}>
+                      {Array.from({ length: weeks }, (_, k) => <option key={k} value={k + 1}>Semana {k + 1}</option>)}
+                    </select>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+      {!live.length && <Empty>Nenhum projeto, hábito, tarefa ou evento ainda. Volte em “Metas e projetos” para adicionar.</Empty>}
+      {s.who.length > 0 && <p className="serif-title" style={{ fontSize: 26 }}>“{s.who.slice(0, 3).map((x) => x.replace(/[.;]+$/, '')).join('. ')}.”</p>}
+      <div className="row between" style={{ marginTop: 8 }}>
+        <button className="btn secondary" onClick={() => { set({ step: ORDER.indexOf('ideias'), sub: 0 }); window.scrollTo({ top: 0 }) }}>Voltar</button>
+        <button className="btn primary" disabled={busy || !s.focus.length} onClick={onFinish}>{busy ? 'Organizando…' : 'Começar o ciclo'}</button>
+      </div>
     </div>
   )
 }

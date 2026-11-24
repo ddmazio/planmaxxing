@@ -136,6 +136,13 @@ export function Ritual() {
               <div className="card stack" style={{ gap: 0 }}><span className="big">{habitHit}/{habitDue.length}</span><span className="caption muted">hábitos</span></div>
               <div className="card stack" style={{ gap: 0 }}><span className="big">{goodRun ? `${goodRun}ª` : '–'}</span><span className="caption muted">semana ≥ 85%{goodRun > 1 ? ' seguida' : ''}</span></div>
             </div>
+            {good && (cycle?.ideas?.length ?? 0) > 0 && (
+              <div className="card stack prize" style={{ gap: 4 }}>
+                <span className="mono">Seu prêmio da semana</span>
+                <span className="serif" style={{ fontSize: 26, lineHeight: '30px' }}>{cycle!.ideas![(W - 1) % cycle!.ideas!.length]}</span>
+                <span className="caption">Da sua lista de ideias do ciclo. Você merece.</span>
+              </div>
+            )}
             {good || wScore == null ? (
               <label className="field"><span>O que funcionou esta semana?</span>
                 <textarea className="input" rows={3} maxLength={1000} value={vals[0] ?? ''} onChange={(e) => setA(0, e.target.value)} /></label>

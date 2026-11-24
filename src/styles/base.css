@@ -515,3 +515,17 @@ input[type='range'] { width: 100%; accent-color: var(--ink); }
 .dot.bad { background: var(--danger); }
 @media (max-width: 860px) { .painel-grid { grid-template-columns: 1fr; } .painel-stats { grid-template-columns: 1fr 1fr; } }
 .owner-ico { width: 34px; height: 34px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--ink); color: var(--on-ink); flex-shrink: 0; }
+
+/* ritual do ciclo */
+.nota-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
+.nota { height: 40px; border-radius: 12px; background: var(--bg-surface); color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--border); font-size: 14px; transition: background .15s, color .15s; }
+.nota.on { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.nota.small { height: 30px; width: 34px; border-radius: 10px; font-size: 12px; }
+.nota:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pair-row { align-items: flex-start; }
+.pair-row .input.bare { min-height: 0; padding: 2px 0; }
+@media (max-width: 480px) { .nota-row { grid-template-columns: repeat(5, 1fr); } }
+details.others > summary { cursor: pointer; list-style: none; }
+details.others > summary::-webkit-details-marker { display: none; }
+details.others[open] > summary .caption::after { content: ' ▴'; }
+.prize { background: var(--lime); color: var(--on-lime); }

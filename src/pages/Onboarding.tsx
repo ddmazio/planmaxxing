@@ -14,6 +14,7 @@ import { AreaIcon, Toggle } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { ListInput } from '../components/ListInput'
 import { GoalWizard } from '../components/GoalWizard'
+import { AREA_CATALOG, presetArea } from '../lib/areas'
 
 const zones = (() => { try { return (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf('timeZone') } catch { return ['Europe/Lisbon', 'America/Sao_Paulo'] } })()
 const STEPS = ['Boas-vindas', 'Sobre você', 'Google Calendar', 'Áreas da vida', 'Finanças', 'Novo ciclo', 'Primeira meta']
@@ -157,7 +158,7 @@ export function Onboarding() {
         {step === 3 && (
           <>
             <h1 className="serif onb-title">O que você quer cuidar neste ciclo?</h1>
-            <p className="muted" style={{ margin: 0 }}>Escolha, renomeie ou crie as suas áreas. Dá para mudar a qualquer momento.</p>
+            <p className="muted" style={{ margin: 0 }}>Marque as áreas de foco deste ciclo (recomendação: até 4) e complete o que você quer ter no fim dele. Dá para mudar a qualquer momento.</p>
             <div className="area-pick">
               {areas.filter((a) => !a.archived).map((a) => {
                 const on = a.focus || a.is_fixed
@@ -178,6 +179,26 @@ export function Onboarding() {
               <input className="input grow" placeholder="Criar outra área (ex.: Casa, Criatividade)" value={newArea} maxLength={40} onChange={(e) => setNewArea(e.target.value)} aria-label="Nova área" />
               <button className="btn secondary" disabled={!newArea.trim()}>Criar</button>
             </form>
+            {(() => {
+              const live = areas.filter((a) => !a.archived)
+              const missing = AREA_CATALOG.filter((p) => !presetArea(p, live))
+              const focused = live.filter((a) => a.focus && !a.is_fixed)
+              return <>
+                {missing.length > 0 && <>
+                  <span className="mono muted">Mais áreas</span>
+                  <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                    {missing.map((p) => <button key={p.key} className="chip" onClick={() => insert<Area>('areas', { name: p.name, color: p.color, icon: p.icon, position: live.length + 1, focus: true, is_fixed: false, archived: false })}>+ {p.name}</button>)}
+                  </div>
+                </>}
+                {focused.length > 4 && <div className="card soft caption"><b>{focused.length} áreas em foco.</b> A recomendação é até 4: com mais que isso a atenção se espalha e as coisas pequenas de cada semana ficam para trás.</div>}
+                {focused.map((a) => (
+                  <label key={a.id} className="field">
+                    <span className="row" style={{ gap: 8 }}><AreaIcon area={a} size={22} />{a.name}: no fim do ciclo eu quero TER…</span>
+                    <textarea className="input" rows={2} maxLength={500} defaultValue={a.why ?? ''} placeholder="Ex.: encontrado um emprego que eu amo" onBlur={(e) => { const v = e.target.value.trim(); if (v !== (a.why ?? '')) update<Area>('areas', a.id, { why: v || null }) }} />
+                  </label>
+                ))}
+              </>
+            })()}
             <p className="caption muted" style={{ margin: 0 }}>Depois: suas finanças, o ciclo e o “Who is she?”.</p>
             <button className="btn primary" style={{ alignSelf: 'flex-end' }} onClick={() => go(4, 0)}>Continuar</button>
           </>
