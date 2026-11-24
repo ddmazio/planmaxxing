@@ -531,3 +531,4 @@ details.others[open] > summary .caption::after { content: ' ▴'; }
 .prize { background: var(--lime); color: var(--on-lime); }
 .ritual-resume { background: var(--lime-soft); box-shadow: none; }
 @media (min-width: 1024px) { .ritual-page.solo { grid-template-columns: minmax(0, 1fr); } .ritual-page.solo .ritual-main { margin: 0 auto; width: 100%; } }
+.ritual-bar { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; margin: -6px 0 8px; } .ritual-bar span { display: block; height: 100%; background: var(--ink); transition: width .3s ease; }

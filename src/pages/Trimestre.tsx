@@ -12,7 +12,7 @@ import { useAuth } from '../lib/auth'
 import type { Area, CalEvent, Cycle, Goal, Habit, Reflection, Step, Task } from '../lib/types'
 import { AreaIcon, AreaTag, Empty, Sheet } from '../components/ui'
 import { Icon } from '../components/Icon'
-import { ListInput, RailSteps } from '../components/ListInput'
+import { ListInput } from '../components/ListInput'
 import { type ShellCtx } from '../components/Shell'
 
 // ---------------------------------------------------------------- estado do ritual (guardado como JSON numa reflexão)
@@ -184,25 +184,17 @@ export function Trimestre() {
   const cur = subList[s.sub]
 
   return (
-    <div className={'page wide ritual-page' + (id === 'inicio' ? ' solo' : '')}>
-      {id !== 'inicio' && <aside className="ritual-rail">
-        <span className="mono muted">Ritual do ciclo</span>
-        <RailSteps title="1 · Olhar para trás" items={P1.map((k) => NAMES[k])} active={part === 1 ? P1.indexOf(id) : -1} done={s.step > ORDER.indexOf('reflexao')} onPick={(i) => go(ORDER.indexOf(P1[i]))} />
-        {id === 'reflexao' && cur && <span className="caption muted" style={{ marginTop: -10, paddingLeft: 10 }}>{cur.name} · {s.sub + 1} de {subList.length}</span>}
-        <RailSteps title="2 · Decidir" items={P2.map((k) => NAMES[k])} active={part === 2 ? P2.indexOf(id) : -1} done={s.step > ORDER.indexOf('metas')} onPick={(i) => go(ORDER.indexOf(P2[i]))} />
-        {id === 'metas' && cur && <span className="caption muted" style={{ marginTop: -10, paddingLeft: 10 }}>{cur.name} · {s.sub + 1} de {subList.length}</span>}
-        <RailSteps title="3 · Organizar" items={P3.map((k) => NAMES[k])} active={part === 3 ? P3.indexOf(id) : -1} done={false} onPick={(i) => go(ORDER.indexOf(P3[i]))} />
-        <span className="caption faint">Dá para pausar a qualquer momento. O app guarda onde você parou.</span>
-      </aside>}
+    <div className="page wide ritual-page solo">
 
       <section className="stack ritual-main">
         <div className="row between">
-          <span className="mono muted">{part ? `Parte ${part} de 3 · ${NAMES[id]}` : 'Início'}</span>
+          <span className="mono muted">{part ? `Parte ${part} de 3 · ${NAMES[id]}${cur ? ` · ${cur.name}, ${s.sub + 1} de ${subList.length}` : ''}` : 'Início'}</span>
           <div className="row" style={{ gap: 4 }}>
             <button className="btn ghost small" onClick={saveAndLeave}><Icon name="download" size={14} />Guardar e sair</button>
             <button className="btn ghost small" onClick={() => setCancelling(true)}><Icon name="x" size={14} />Cancelar ciclo</button>
           </div>
         </div>
+        {part > 0 && <div className="ritual-bar" aria-hidden><span style={{ width: `${Math.round((s.step / (ORDER.length - 1)) * 100)}%` }} /></div>}
 
         {id === 'inicio' && (
           <div className="stack">
