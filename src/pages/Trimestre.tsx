@@ -35,6 +35,7 @@ interface RT {
 }
 const empty = (): RT => ({ v: 2, step: 0, sub: 0, reflect: [], created: [], refl: {}, focus: [], vision: {}, rewards: [], words: [], who: [], metas: [], items: [], ideas: [] })
 const blankRefl = (): AreaRefl => ({ score: null, good: [], bad: [], improve: [] })
+const fmtNota = (n: number) => String(n).replace('.', ',')
 const uid = () => Math.random().toString(36).slice(2, 10)
 
 const P1 = RITUAL_P1, P2 = RITUAL_P2, P3 = RITUAL_P3, ORDER = RITUAL_ORDER, NAMES = RITUAL_NAMES
@@ -389,11 +390,20 @@ function Reflect({ area, r, onChange }: { area: Area; r: AreaRefl; onChange: (r:
   return (
     <div className="stack">
       <div className="row" style={{ gap: 12 }}><AreaIcon area={area} size={40} /><h1 className="serif-title" style={{ margin: 0 }}>{area.name}</h1></div>
-      <span className="mono muted">Nota de 1 a 10 no último ciclo{area.score_now != null ? ` · antes: ${Number(area.score_now)}` : ''}</span>
-      <div className="nota-row" role="radiogroup" aria-label={`Nota de ${area.name}`}>
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-          <button key={n} type="button" role="radio" aria-checked={r.score === n} className={'nota mono' + (r.score === n ? ' on' : '')} onClick={() => set({ score: r.score === n ? null : n })}>{n}</button>
-        ))}
+      <div className="nota-slider">
+        <div className="row between" style={{ alignItems: 'baseline' }}>
+          <span className="mono muted">Nota de 0 a 10 no último ciclo{area.score_now != null ? ` · antes: ${fmtNota(Number(area.score_now))}` : ''}</span>
+          <span className="serif nota-val">{r.score == null ? '–' : fmtNota(r.score)}</span>
+        </div>
+        <input type="range" min={0} max={10} step={0.5} value={r.score ?? 5} className={'nota-range' + (r.score == null ? ' unset' : '')}
+          style={{ ['--p' as string]: `${((r.score ?? 5) / 10) * 100}%` }}
+          aria-label={`Nota de ${area.name}`} aria-valuetext={r.score == null ? 'sem nota' : fmtNota(r.score)}
+          onChange={(e) => set({ score: Number(e.target.value) })}
+          onPointerUp={(e) => r.score == null && set({ score: Number(e.currentTarget.value) })}
+          onKeyUp={(e) => r.score == null && set({ score: Number(e.currentTarget.value) })} />
+        <div className="row between caption muted"><span>0</span><span>5</span><span>10</span></div>
+        {r.score == null ? <span className="caption muted">Arraste para dar a nota.</span>
+          : <button className="caption muted" style={{ alignSelf: 'flex-start' }} onClick={() => set({ score: null })}>Tirar a nota</button>}
       </div>
       <span className="mono muted">O que funcionou, e como · até 4</span>
       <PairList label="O que funcionou" max={4} a="Ex.: caminhar de manhã" b="Como? Ex.: deixava o tênis na porta"
@@ -420,7 +430,7 @@ function Foco({ areas, s, set }: { areas: Area[]; s: RT; set: (p: Partial<RT>) =
           return <button key={a.id} className={'area-card' + (on ? ' on' : '')} aria-pressed={on}
             style={on ? { background: `var(--${a.color}-bg)`, color: `var(--${a.color}-fg)` } : undefined}
             onClick={() => set({ focus: on ? s.focus.filter((x) => x !== a.id) : [...s.focus, a.id] })}>
-            <div className="row between"><AreaIcon area={a} size={30} />{on ? <Icon name="check" size={16} /> : r?.score != null && <span className="mono caption">{r.score}/10</span>}</div>
+            <div className="row between"><AreaIcon area={a} size={30} />{on ? <Icon name="check" size={16} /> : r?.score != null && <span className="mono caption">{fmtNota(r.score)}/10</span>}</div>
             <span className="medium">{a.name}</span>
             {r?.improve[0] && <span className="caption" style={{ opacity: 0.8 }}>{r.improve[0]}</span>}
           </button>

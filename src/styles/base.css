@@ -532,3 +532,11 @@ details.others[open] > summary .caption::after { content: ' ▴'; }
 .ritual-resume { background: var(--lime-soft); box-shadow: none; }
 @media (min-width: 1024px) { .ritual-page.solo { grid-template-columns: minmax(0, 1fr); } .ritual-page.solo .ritual-main { margin: 0 auto; width: 100%; } }
 .ritual-bar { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; margin: -6px 0 8px; } .ritual-bar span { display: block; height: 100%; background: var(--ink); transition: width .3s ease; }
+.nota-slider { display: flex; flex-direction: column; gap: 8px; }
+.nota-val { font-size: 40px; line-height: 1; }
+.nota-range { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--ink) var(--p), var(--border) var(--p)); outline: none; }
+.nota-range.unset { background: var(--border); }
+.nota-range::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%; background: var(--bg-surface); box-shadow: 0 0 0 2px var(--ink), 0 2px 6px rgba(0,0,0,.15); cursor: pointer; }
+.nota-range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--ink); cursor: pointer; }
+.nota-range.unset::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--text-tertiary); }
+.nota-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--ink), 0 0 0 5px var(--focus); }
