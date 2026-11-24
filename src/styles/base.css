@@ -540,3 +540,4 @@ details.others[open] > summary .caption::after { content: ' ▴'; }
 .nota-range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--ink); cursor: pointer; }
 .nota-range.unset::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--text-tertiary); }
 .nota-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--ink), 0 0 0 5px var(--focus); }
+.bottom-nav .plus-gap { width: 64px; height: 50px; }

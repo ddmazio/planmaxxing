@@ -38,6 +38,8 @@ export function Shell() {
   const EW = execWeeks(cycle), TW = totalWeeks(cycle)
   const loc = useLocation()
   const cicloZone = ['/ciclo', '/reflexoes', '/grupo', '/convite', '/habito', '/semana', '/trimestre'].some((p) => loc.pathname.startsWith(p))
+  // no ritual de novo ciclo o “+ Novo” sai da tela: o foco é planejar, não lançar coisas soltas
+  const inRitual = loc.pathname.startsWith('/ciclo/trimestre')
   const isTab = (to: string) => (to === '/ciclo' ? cicloZone : loc.pathname.startsWith(to))
   const isActive = (to: string) => (to === '/' ? loc.pathname === '/' : to === '/ciclo' ? loc.pathname.startsWith('/ciclo') && !loc.pathname.startsWith('/ciclo/area') : to === '/grupo' ? loc.pathname.startsWith('/grupo') || loc.pathname.startsWith('/convite') : loc.pathname.startsWith(to))
 
@@ -54,7 +56,7 @@ export function Shell() {
       const k = e.key.toLowerCase()
       if (Date.now() - gAt.current < 1200) { gAt.current = 0; const hit = GOTO.find(([key]) => key === k); if (hit) { e.preventDefault(); nav(hit[2]) } return }
       if (k === 'g') { gAt.current = Date.now(); return }
-      if (k === 'n') { e.preventDefault(); openNew('task') }
+      if (k === 'n' && !window.location.pathname.startsWith('/ciclo/trimestre')) { e.preventDefault(); openNew('task') }
     }
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
@@ -126,7 +128,7 @@ export function Shell() {
           <span className="grow" />
           <NavLink to="/" end className={({ isActive: on }) => 'icon-btn mobile-only' + (on ? ' ink' : '')} aria-label="Início"><Icon name="home" size={19} /></NavLink>
           <button className="icon-btn mobile-only" aria-label="Buscar" onClick={() => setSearch(true)}><Icon name="search" size={19} /></button>
-          <button className="btn primary new-btn desktop-only" onClick={() => openNew()}><Icon name="plus" size={16} />Novo</button>
+          {!inRitual && <button className="btn primary new-btn desktop-only" onClick={() => openNew()}><Icon name="plus" size={16} />Novo</button>}
         </div>
         {notice && <div className="notice-bar" role="status"><Icon name="bell" size={14} /><span className="grow">{notice}</span><button className="notice-x" onClick={hideNotice} aria-label="Fechar aviso"><Icon name="x" size={14} /></button></div>}
         {stale && <div className="notice-bar" role="status"><Icon name="repeat" size={14} /><span className="grow">Tem uma versão nova do app.</span><button className="btn small" onClick={() => window.location.reload()}>Atualizar</button></div>}
@@ -140,7 +142,7 @@ export function Shell() {
         {MAIN_LEFT.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => (isTab(to) ? 'active' : '')}><Icon name={icon} size={22} /><span>{label}</span></NavLink>
         ))}
-        <button className="plus" aria-label="Novo" onClick={() => openNew()}><Icon name="plus" size={24} /></button>
+        {inRitual ? <span className="plus-gap" aria-hidden /> : <button className="plus" aria-label="Novo" onClick={() => openNew()}><Icon name="plus" size={24} /></button>}
         {MAIN_RIGHT.map(([to, label, icon]) => (
           <NavLink key={to} to={to} className={() => (isTab(to) ? 'active' : '')}><Icon name={icon} size={22} /><span>{label}</span></NavLink>
         ))}
