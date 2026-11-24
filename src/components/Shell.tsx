@@ -124,7 +124,7 @@ export function Shell() {
       </aside>
 
       <main className="main">
-        <div className="topbar">
+        <div className={'topbar' + (inRitual ? ' bare' : '')}>
           <Link to="/config" className="topbar-me mobile-only" aria-label="Perfil e configurações">{name.charAt(0).toUpperCase()}</Link>
           <span className="grow" />
           <NavLink to="/" end className={({ isActive: on }) => 'icon-btn mobile-only' + (on ? ' ink' : '')} aria-label="Início"><Icon name="home" size={19} /></NavLink>

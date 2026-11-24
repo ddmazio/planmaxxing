@@ -3,12 +3,13 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { insert, remove, removeWhere, update } from '../lib/db'
 import { useRows } from '../lib/hooks'
 import { addDays, fmt, fromYmd, toIso, todayYmd, weekStart, ymd } from '../lib/dates'
-import { execWeeks, totalWeeks, currentCycle, daysUntil, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
+import { execWeeks, totalWeeks, currentCycle, daysUntil, newCycleDates, score, scoreLabel, weekOf, weekRange } from '../lib/cycle'
+import { DurationPicker } from '../components/DurationPicker'
 import type { Area, CalEvent, Cycle, Goal, Habit, HabitLog, List, Reflection, Step, Task } from '../lib/types'
 import { TaskRow } from '../components/TaskRow'
 import { GoalWizard } from '../components/GoalWizard'
 import { otherAreas } from '../lib/areas'
-import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet } from '../components/ui'
+import { AreaIcon, AreaTag, Check, Empty, SectionHead, Sheet, PageSkeleton } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
 import { useRitualDraft } from '../lib/ritual'
@@ -37,7 +38,7 @@ const splitLines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Bool
 // ---------------------------------------------------------------- página /ciclo
 export function Ciclo() {
   const data = useCycle()
-  if (data.loading) return <div className="page"><p className="muted">Carregando…</p></div>
+  if (data.loading) return <PageSkeleton rows={5} />
   return data.cycle ? <CicloAtivo data={data} cycle={data.cycle} /> : <NovoCiclo />
 }
 
@@ -69,6 +70,7 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
   const [week, setWeek] = useState(execNow)
   const [newGoal, setNewGoal] = useState(false)
   const [editVision, setEditVision] = useState(false)
+  const [adjust, setAdjust] = useState(false)
   const nav = useNavigate()
   const { rows: reflections } = useRows<Reflection>('reflections', { eq: { cycle_id: cycle.id }, order: { column: 'week', ascending: false } })
   const { rows: habits } = useRows<Habit>('habits', { eq: { archived: false } })
@@ -101,8 +103,9 @@ function CicloAtivo({ data, cycle }: { data: ReturnType<typeof useCycle>; cycle:
           : ended ? 'terminado'
           : now === TOTAL_WEEKS ? 'semana de revisão'
           : `semana ${now} de ${EXEC_WEEKS}`}`} title="Plano do ciclo"
-        right={<div className="row" style={{ gap: 8 }}><Link className="btn secondary small" to="/grupo"><Icon name="users" size={16} />Grupo</Link><Link className="btn primary small" to="/ciclo/ritual"><Icon name="sparkle" size={16} />Ritual da semana</Link></div>} />
+        right={<div className="row" style={{ gap: 8 }}><button className="btn ghost small" onClick={() => setAdjust(true)}><Icon name="settings" size={16} />Ajustar ciclo</button><Link className="btn secondary small" to="/grupo"><Icon name="users" size={16} />Grupo</Link><Link className="btn primary small" to="/ciclo/ritual"><Icon name="sparkle" size={16} />Ritual da semana</Link></div>} />
       <RitualResume />
+      <AjustarCiclo key={`${cycle.id}-${cycle.starts_on}-${cycle.ends_on}-${cycle.name}`} open={adjust} onClose={() => setAdjust(false)} cycle={cycle} steps={steps} />
 
       <div className="plan-stats">
         <div><span className="big">{goals.length}</span><span className="caption muted">meta{goals.length === 1 ? '' : 's'}</span></div>
@@ -362,7 +365,7 @@ export function AreaPage() {
   const [task, setTask] = useState('')
   const [step, setStep] = useState('')
   const area = areas.find((a) => a.id === id)
-  if (!area) return <div className="page"><p className="muted">{loading ? 'Carregando…' : 'Área não encontrada.'}</p></div>
+  if (!area) return loading ? <PageSkeleton /> : <div className="page"><p className="muted">Área não encontrada.</p></div>
   const areaGoals = goals.filter((g) => g.area_id === area.id)
   const focus = areaGoals.length > 0
   const current = cycle ? Math.min(Math.max(weekOf(cycle), 1), execWeeks(cycle)) : 1
@@ -550,4 +553,37 @@ export function useWeekSteps() {
     return { step, goal, area: areas.find((a) => a.id === goal?.area_id) }
   })
   return { cycle, week, items, toggle: toggleStep, today: todayYmd() }
+}
+
+// ---------------------------------------------------------------- ajustar um ciclo em andamento
+function AjustarCiclo({ open, onClose, cycle, steps }: { open: boolean; onClose: () => void; cycle: Cycle; steps: Step[] }) {
+  const { toast } = useOutletContext<ShellCtx>()
+  const [name, setName] = useState(cycle.name)
+  const [start, setStart] = useState(cycle.starts_on)
+  const [weeks, setWeeks] = useState(execWeeks(cycle))
+  const [busy, setBusy] = useState(false)
+  const beyond = steps.filter((x) => x.week > weeks)
+  const save = async () => {
+    setBusy(true)
+    try {
+      // passos que ficariam depois do fim vão para a última semana (nada é apagado)
+      for (const x of beyond) await update<Step>('steps', x.id, { week: weeks })
+      await update<Cycle>('cycles', cycle.id, { name: name.trim().slice(0, 40) || cycle.name, ...newCycleDates(start, weeks) })
+      toast('Ciclo ajustado.')
+      onClose()
+    } catch (e) { toast(`Não deu para ajustar: ${e instanceof Error ? e.message : 'erro'}`) }
+    setBusy(false)
+  }
+  return (
+    <Sheet open={open} onClose={onClose} title="Ajustar ciclo" labelledBy="ajustar-ciclo">
+      <div className="stack" style={{ gap: 12 }}>
+        <label className="field"><span>Nome do ciclo</span><input className="input" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="field"><span>Começa em</span><input className="input" type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} /></label>
+        <DurationPicker weeks={weeks} start={start} onChange={setWeeks} />
+        {beyond.length > 0 && <div className="card soft caption">{beyond.length} passo{beyond.length > 1 ? 's estão' : ' está'} depois da semana {weeks}. Ao salvar, {beyond.length > 1 ? 'vão' : 'vai'} para a semana {weeks}; nada é apagado.</div>}
+        <span className="caption muted">Os passos continuam nas mesmas semanas do ciclo. Tarefas e eventos com data não mudam.</span>
+        <button className="btn primary block" disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar'}</button>
+      </div>
+    </Sheet>
+  )
 }

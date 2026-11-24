@@ -7,7 +7,7 @@ import { useRows } from '../lib/hooks'
 import { weekStart } from '../lib/dates'
 import { execWeeks, score, weekOf } from '../lib/cycle'
 import type { Area, Checkin, Cheer, Group, GroupInvite, GroupMember, List, ListMember, Task } from '../lib/types'
-import { AreaIcon, Empty, SectionHead, Sheet } from '../components/ui'
+import { AreaIcon, Empty, SectionHead, Sheet, PageSkeleton } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
 import { useCycle } from './Ciclo'
@@ -51,7 +51,7 @@ export function Grupo() {
     <div className="page"><PageHeader title="Grupo" />
       <Empty>O grupo precisa da conta online, porque junta pessoas diferentes. No modo demonstração ele fica desligado.</Empty></div>
   )
-  if (loading) return <div className="page"><p className="muted">Carregando…</p></div>
+  if (loading) return <PageSkeleton />
   const group = groups.find((g) => g.id === sel) ?? groups[0]
 
   async function create(e: React.FormEvent) {

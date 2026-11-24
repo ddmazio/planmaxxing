@@ -7,7 +7,7 @@ import { addDays, fmt, fromYmd, toIso, todayYmd, ymd } from '../lib/dates'
 import { execWeeks, score, weekOf } from '../lib/cycle'
 import { cycleWeekDays } from '../lib/execution'
 import type { CalEvent, Checkin, Cheer, Group, Habit, HabitLog, Reflection, Step } from '../lib/types'
-import { AreaTag, Empty, Toggle } from '../components/ui'
+import { AreaTag, Empty, Toggle, PageSkeleton } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { PageHeader, type ShellCtx } from '../components/Shell'
 import { useCycle } from './Ciclo'
@@ -54,7 +54,7 @@ export function Ritual() {
   const vals = answers ?? existing?.answers ?? ['', '', '', '']
   const setA = (i: number, v: string) => { const n = [...vals]; while (n.length < 4) n.push(''); n[i] = v; setAnswers(n) }
 
-  if (loading) return <div className="page"><p className="muted">Carregando…</p></div>
+  if (loading) return <PageSkeleton />
   if (!cycle) return <div className="page"><PageHeader title="Ritual da semana" /><Empty>Crie um ciclo primeiro. <Link className="link" to="/ciclo">Criar ciclo</Link></Empty></div>
 
   // ---- placar da semana W

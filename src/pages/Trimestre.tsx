@@ -10,7 +10,7 @@ import { DurationPicker } from '../components/DurationPicker'
 import { useApp } from '../lib/app'
 import { useAuth } from '../lib/auth'
 import type { Area, CalEvent, Cycle, Goal, Habit, Reflection, Step, Task } from '../lib/types'
-import { AreaIcon, AreaTag, Empty, Sheet } from '../components/ui'
+import { AreaIcon, AreaTag, Empty, Sheet, PageSkeleton } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { ListInput } from '../components/ListInput'
 import { type ShellCtx } from '../components/Shell'
@@ -32,10 +32,11 @@ interface RT {
   metas: Meta[]; items: Item[]
   ideas: string[]
   keyDates?: { id: string; t: string; d: string; e?: string }[]
-  newCycleId?: string; weeks?: number; start?: string; finished?: boolean
+  newCycleId?: string; weeks?: number; start?: string; name?: string; finished?: boolean
 }
 const empty = (): RT => ({ v: 2, step: 0, sub: 0, reflect: [], created: [], refl: {}, focus: [], vision: {}, rewards: [], words: [], who: [], metas: [], items: [], ideas: [] })
 const blankRefl = (): AreaRefl => ({ score: null, good: [], bad: [], improve: [] })
+const defaultName = (d: Date) => `Q${Math.floor(d.getMonth() / 3) + 1} · ${d.getFullYear()}`
 const fmtNota = (n: number) => String(n).replace('.', ',')
 const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -128,7 +129,7 @@ export function Trimestre() {
     } catch { discarded.current = false; toast('Não deu para cancelar agora. Tente de novo.') }
   }
 
-  if (loading) return <div className="page"><p className="muted">Carregando…</p></div>
+  if (loading) return <PageSkeleton />
   const id = ORDER[s.step]
   const areaOf = (k: string) => areas.find((a) => a.id === k)
   const reflectAreas = s.reflect.map(areaOf).filter((a): a is Area => !!a)
@@ -162,7 +163,7 @@ export function Trimestre() {
     setBusy(true)
     try {
       const d = fromYmd(nextStart)
-      const c = newCycle ?? await insert<Cycle>('cycles', { name: `Q${Math.floor(d.getMonth() / 3) + 1} · ${d.getFullYear()}`, ...newCycleDates(nextStart, nextWeeks), status: 'planning', words: [], who_is_she: [] })
+      const c = newCycle ?? await insert<Cycle>('cycles', { name: (s.name ?? '').trim().slice(0, 40) || defaultName(d), ...newCycleDates(nextStart, nextWeeks), status: 'planning', words: [], who_is_she: [] })
       if (!newCycle) set({ newCycleId: c.id })
       const weekDay = (w: number) => ymd(addDays(fromYmd(c.starts_on), (w - 1) * 7))
       // metas
@@ -192,7 +193,7 @@ export function Trimestre() {
         if (s.created.includes(a.id) && !s.reflect.includes(a.id)) patch.archived = true
         await update<Area>('areas', a.id, patch)
       }
-      const base = { status: 'active' as const, words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) }
+      const base = { status: 'active' as const, name: (s.name ?? '').trim().slice(0, 40) || c.name, words: s.words.slice(0, 10), who_is_she: s.who.slice(0, 20) }
       try { await update<Cycle>('cycles', c.id, { ...base, rewards: s.rewards.filter((r) => s.focus.includes(r.area)), ideas: s.ideas.slice(0, 60), key_dates: (s.keyDates ?? []).slice(0, 120) }) }
       catch { await update<Cycle>('cycles', c.id, base) } // banco ainda sem as colunas novas: guarda o resto
       if (old && old.id !== c.id) await update<Cycle>('cycles', old.id, { status: 'closed' })
@@ -241,14 +242,14 @@ export function Trimestre() {
     <div className="page wide ritual-page solo">
 
       <section className="stack ritual-main">
-        <div className="row between">
+        <div className="row between ritual-head">
           <span className="mono muted">{part ? `Parte ${part} de 3 · ${NAMES[id]}${cur ? ` · ${cur.name}, ${s.sub + 1} de ${subList.length}` : ''}` : 'Início'}</span>
           <div className="row" style={{ gap: 4 }}>
             <span className={'save-state caption ' + saveState} role="status" aria-live="polite">
               {saveState === 'saving' ? 'Guardando…' : saveState === 'saved' ? <><Icon name="check" size={13} />Guardado</> : saveState === 'error' ? 'Não guardou. Sem internet?' : ''}
             </span>
-            <button className="btn ghost small" onClick={saveAndLeave}><Icon name="download" size={14} />Guardar e sair</button>
-            <button className="btn ghost small" onClick={() => setCancelling(true)}><Icon name="x" size={14} />Cancelar ciclo</button>
+            <button className="btn ghost small" onClick={saveAndLeave} aria-label="Guardar e sair"><Icon name="download" size={14} /><span className="lbl">Guardar e sair</span></button>
+            <button className="btn ghost small" onClick={() => setCancelling(true)} aria-label="Cancelar ciclo"><Icon name="x" size={14} /><span className="lbl">Cancelar ciclo</span></button>
           </div>
         </div>
         {part > 0 && <div className="ritual-bar" aria-hidden><span style={{ width: `${Math.round((s.step / (ORDER.length - 1)) * 100)}%` }} /></div>}
@@ -272,6 +273,8 @@ export function Trimestre() {
               ))}
             </div>
             <span className="mono muted" style={{ marginTop: 8 }}>O próximo ciclo</span>
+            <label className="field"><span>Nome do ciclo</span>
+              <input className="input" maxLength={40} value={s.name ?? ''} placeholder={defaultName(fromYmd(nextStart))} onChange={(e) => set({ name: e.target.value })} /></label>
             <DurationPicker weeks={nextWeeks} start={nextStart} onChange={(w) => setNext({ weeks: w })} />
             <label className="field"><span>Começa em</span><input className="input" type="date" value={nextStart} onChange={(e) => e.target.value && setNext({ start: e.target.value })} /></label>
           </div>

@@ -68,3 +68,16 @@ export function SectionHead({ title, action }: { title: string; action?: ReactNo
 }
 
 export function Toast({ msg }: { msg: string | null }) { return msg ? <div className="toast" role="status">{msg}</div> : null }
+
+/** Blocos claros no formato da página enquanto os dados chegam (no lugar de “Carregando…”). */
+export function PageSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="page" aria-busy="true" aria-label="Carregando">
+      <div className="skel" style={{ width: 120, height: 12 }} />
+      <div className="skel" style={{ width: '45%', height: 34, marginTop: 8 }} />
+      <div className="stack" style={{ marginTop: 20 }}>
+        {Array.from({ length: rows }, (_, i) => <div key={i} className="skel" style={{ height: i === 0 ? 120 : 64, borderRadius: 20 }} />)}
+      </div>
+    </div>
+  )
+}
